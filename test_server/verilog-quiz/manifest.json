@@ -1,4 +1,6 @@
 {
   "version": "1.0",
-  "weeks": ["week1"]
+  "weeks": [
+    "week1"
+  ]
 }

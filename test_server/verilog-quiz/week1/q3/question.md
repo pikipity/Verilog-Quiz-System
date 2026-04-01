@@ -1,16 +1,15 @@
 # 题目：半加器
 
-实现一个半加器，输入a和b，输出sum（和）和cout（进位）。
+实现一个半加器。
 
 ## 端口定义
 
 | 端口 | 方向 | 位宽 | 说明 |
 |------|------|------|------|
-| a | input | 1 | 输入a |
-| b | input | 1 | 输入b |
-| sum | output | 1 | 和 |
-| cout | output | 1 | 进位 |
+| a | input | 1 | 输入 |
+| b | input | 1 | 输入 |
+| sum | input | 1 | 输入 |
+| cout | output | 1 | 输出 |
 
 ## 提示
-- sum = a ^ b（异或）
-- cout = a & b（与）
+使用assign语句实现

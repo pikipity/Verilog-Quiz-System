@@ -3,6 +3,7 @@
 """
 import os
 import json
+import threading
 from datetime import datetime
 import flet as ft
 from config import QUESTIONS_DIR, SUBMISSIONS_DIR, SERVER_URL
@@ -14,6 +15,7 @@ class WeekSelector:
     def __init__(self, app):
         self.app = app
         self.weeks_data = []
+        self.check_update_btn = None
     
     def build(self) -> ft.Control:
         """构建界面"""
@@ -90,7 +92,6 @@ class WeekSelector:
         title = week_info.get("title", f"第{week}周")
         start_date = week_info.get("start_date", "")
         end_date = week_info.get("end_date", "")
-        select_count = week_info.get("select_count", 0)
         
         # 检查该周的进度
         progress = self._get_week_progress(week)
@@ -172,16 +173,18 @@ class WeekSelector:
     
     def _build_footer(self) -> ft.Control:
         """构建底部栏"""
+        self.check_update_btn = ft.ElevatedButton(
+            "检查更新",
+            icon=ft.Icons.REFRESH,
+            on_click=self._on_check_update,
+        )
+        
         return ft.Container(
             content=ft.Row(
                 [
-                    ft.ElevatedButton(
-                        "检查更新",
-                        icon=ft.Icons.REFRESH,
-                        on_click=self._on_check_update,
-                    ),
+                    self.check_update_btn,
                     ft.Text(
-                        f"题目服务器: {SERVER_URL}",
+                        f"服务器: {SERVER_URL}",
                         size=12,
                         color=ft.Colors.GREY,
                     ),
@@ -195,7 +198,6 @@ class WeekSelector:
         """加载本地周次数据"""
         self.weeks_data = []
         
-        # 遍历questions目录
         if not os.path.exists(QUESTIONS_DIR):
             return
         
@@ -204,7 +206,6 @@ class WeekSelector:
             if not os.path.isdir(week_dir):
                 continue
             
-            # 检查是否是周次目录（如week1, week2）
             if item.startswith("week"):
                 info_file = os.path.join(week_dir, "info.json")
                 if os.path.exists(info_file):
@@ -215,87 +216,169 @@ class WeekSelector:
                     except Exception as e:
                         print(f"读取{info_file}失败: {e}")
         
-        # 按周次排序
         self.weeks_data.sort(key=lambda x: x.get("week", 0))
     
     def _get_week_progress(self, week: int) -> dict:
-        """获取周次进度"""
-        progress_file = os.path.join(SUBMISSIONS_DIR, f"week{week}", "progress.json")
-        
-        if os.path.exists(progress_file):
-            try:
-                with open(progress_file, 'r', encoding='utf-8') as f:
-                    data = json.load(f)
-                    questions = data.get("questions", [])
-                    completed = sum(1 for q in questions if q.get("status") == "completed")
-                    return {
-                        "completed": completed,
-                        "total": len(questions),
-                    }
-            except Exception:
-                pass
-        
-        # 检查draw_result获取总题数
+        """获取周次进度（新格式）"""
         draw_file = os.path.join(QUESTIONS_DIR, f"week{week}", "draw_result.json")
+        total = 0
         if os.path.exists(draw_file):
             try:
                 with open(draw_file, 'r', encoding='utf-8') as f:
                     data = json.load(f)
-                    return {
-                        "completed": 0,
-                        "total": len(data.get("drawn_questions", [])),
-                    }
+                    total = len(data.get("drawn_questions", []))
             except Exception:
                 pass
         
-        # 默认返回0
-        return {"completed": 0, "total": 0}
+        progress_file = os.path.join(SUBMISSIONS_DIR, f"week{week}", "progress.json")
+        completed = 0
+        if os.path.exists(progress_file):
+            try:
+                with open(progress_file, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                    questions = data.get("questions", {})
+                    if isinstance(questions, dict):
+                        completed = sum(1 for q in questions.values() if q.get("status") == "completed")
+                    else:
+                        completed = sum(1 for q in questions if q.get("status") == "completed")
+            except Exception:
+                pass
+        
+        return {"completed": completed, "total": total}
     
     def _on_week_click(self, week: int):
         """周次点击事件"""
-        # 检查是否需要抽题
         draw_file = os.path.join(QUESTIONS_DIR, f"week{week}", "draw_result.json")
         
         if not os.path.exists(draw_file):
-            # 需要下载并抽题
             self.app.show_snackbar("请先点击'检查更新'下载题目", ft.Colors.ORANGE)
             return
         
-        # 进入答题界面，从第一题开始
         self.app.show_question_view(week, 0)
     
     def _on_check_update(self, e):
         """检查更新按钮点击"""
         from core.question_manager import question_manager
+        import threading
         
-        self.app.show_snackbar("正在检查更新...", ft.Colors.BLUE)
+        # 创建全屏加载遮罩
+        self.loading_overlay = ft.Container(
+            content=ft.Column(
+                [
+                    ft.ProgressRing(width=50, height=50, stroke_width=4),
+                    ft.Text("正在连接服务器...", size=16, color=ft.Colors.WHITE),
+                ],
+                alignment=ft.MainAxisAlignment.CENTER,
+                horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+                spacing=20,
+            ),
+            bgcolor=ft.Colors.BLACK54,
+            alignment=ft.Alignment.CENTER,
+            expand=True,
+        )
         
-        # 检查更新
-        has_update, weeks = question_manager.check_update()
+        # 添加到页面最上层
+        self.app.page.overlay.append(self.loading_overlay)
+        self.app.page.update()
         
-        if not has_update:
-            self.app.show_snackbar("已经是最新题目", ft.Colors.GREEN)
-            return
+        # 在新线程执行检查
+        def do_check():
+            status, weeks, error_msg = question_manager.check_update()
+            
+            def update_ui():
+                # 移除加载遮罩
+                if self.loading_overlay in self.app.page.overlay:
+                    self.app.page.overlay.remove(self.loading_overlay)
+                
+                if status == "error":
+                    def close_error(e):
+                        error_dialog.open = False
+                        self.app.page.update()
+                    
+                    error_dialog = ft.AlertDialog(
+                        title=ft.Text("连接失败", color=ft.Colors.RED),
+                        content=ft.Text(error_msg, selectable=True),
+                        actions=[ft.ElevatedButton("确定", on_click=close_error)],
+                        actions_alignment=ft.MainAxisAlignment.END,
+                    )
+                    self.app.page.overlay.append(error_dialog)
+                    error_dialog.open = True
+                
+                elif status == "no_update":
+                    self.app.show_snackbar("已经是最新题目", ft.Colors.GREEN)
+                
+                elif status == "success":
+                    self._show_download_dialog(weeks)
+                
+                self.app.page.update()
+            
+            self.app.page.run_thread(update_ui)
         
-        # 有更新，显示对话框
+        thread = threading.Thread(target=do_check)
+        thread.daemon = True
+        thread.start()
+    
+    def _show_download_dialog(self, weeks):
+        """显示下载对话框"""
+        from core.question_manager import question_manager
+        import threading
+        
         def confirm_download(e):
             dialog.open = False
             self.app.page.update()
             
-            # 下载所有需要更新的周次
-            success_count = 0
-            for week in weeks:
-                self.app.show_snackbar(f"正在下载 Week {week}...", ft.Colors.BLUE)
-                if question_manager.download_week(week):
-                    success_count += 1
+            # 创建全屏加载遮罩
+            self.loading_overlay = ft.Container(
+                content=ft.Column(
+                    [
+                        ft.ProgressRing(width=50, height=50, stroke_width=4),
+                        ft.Text(f"正在下载 {len(weeks)} 周题目...", size=16, color=ft.Colors.WHITE),
+                    ],
+                    alignment=ft.MainAxisAlignment.CENTER,
+                    horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+                    spacing=20,
+                ),
+                bgcolor=ft.Colors.BLACK54,
+                alignment=ft.Alignment.CENTER,
+                expand=True,
+            )
             
-            if success_count == len(weeks):
-                self.app.show_snackbar(f"成功下载 {success_count} 周题目", ft.Colors.GREEN)
-                # 刷新界面
-                self._load_weeks_data()
-                self.app.show_week_selector()
-            else:
-                self.app.show_snackbar(f"下载完成: {success_count}/{len(weeks)} 周", ft.Colors.ORANGE)
+            # 添加到页面最上层
+            self.app.page.overlay.append(self.loading_overlay)
+            self.app.page.update()
+            
+            # 在新线程执行下载
+            def do_download():
+                success_count = 0
+                for i, week in enumerate(weeks):
+                    # 更新提示文字
+                    def update_text(idx=i):
+                        if hasattr(self, 'loading_overlay') and self.loading_overlay:
+                            self.loading_overlay.content.controls[1].value = f"正在下载 Week {weeks[idx]}... ({idx+1}/{len(weeks)})"
+                            self.app.page.update()
+                    
+                    self.app.page.run_thread(update_text)
+                    
+                    if question_manager.download_week(week):
+                        success_count += 1
+                
+                def update_ui():
+                    # 移除加载遮罩
+                    if hasattr(self, 'loading_overlay') and self.loading_overlay in self.app.page.overlay:
+                        self.app.page.overlay.remove(self.loading_overlay)
+                    
+                    if success_count == len(weeks):
+                        self.app.show_snackbar(f"成功下载 {success_count} 周题目", ft.Colors.GREEN)
+                        self._load_weeks_data()
+                        self.app.show_week_selector()
+                    else:
+                        self.app.show_snackbar(f"下载完成: {success_count}/{len(weeks)} 周", ft.Colors.ORANGE)
+                
+                self.app.page.run_thread(update_ui)
+            
+            thread = threading.Thread(target=do_download)
+            thread.daemon = True
+            thread.start()
         
         def cancel(e):
             dialog.open = False

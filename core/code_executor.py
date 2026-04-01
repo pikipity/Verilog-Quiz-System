@@ -72,11 +72,9 @@ class CodeExecutor:
         """
         try:
             if self.use_wsl:
-                # Windows路径转换为WSL路径
-                if cwd:
-                    cwd = self._to_wsl_path(cwd)
-                # 转换命令中的文件路径
-                cmd = [self._to_wsl_path(arg) if os.path.exists(arg) or '/' in arg else arg 
+                # 转换命令中的文件路径为WSL路径
+                # 注意：cwd保持Windows路径，因为subprocess.run需要Windows路径
+                cmd = [self._to_wsl_path(arg) if os.path.exists(arg) or ('/' in arg and ':' not in arg) else arg 
                        for arg in cmd]
                 cmd = ['wsl'] + cmd
             

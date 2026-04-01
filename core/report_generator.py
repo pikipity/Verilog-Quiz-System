@@ -15,6 +15,7 @@ class ReportGenerator:
     报告生成器
     
     整合学生代码、测试结果生成Markdown报告
+    使用ID系统查找题目和结果
     """
     
     def __init__(self):
@@ -30,7 +31,7 @@ class ReportGenerator:
         Returns:
             生成的报告文件路径，失败返回None
         """
-        # 读取抽题结果
+        # 读取抽题结果（新格式）
         draw_file = os.path.join(QUESTIONS_DIR, f"week{week}", "draw_result.json")
         if not os.path.exists(draw_file):
             print(f"未找到抽题结果: {draw_file}")
@@ -60,9 +61,9 @@ class ReportGenerator:
             "",
         ]
         
-        # 逐题生成
-        for idx, q_id in enumerate(drawn_questions, 1):
-            q_content = self._generate_question_section(week, idx, q_id)
+        # 逐题生成（使用ID查找）
+        for idx, q_info in enumerate(drawn_questions, 1):
+            q_content = self._generate_question_section(week, idx, q_info)
             report_lines.extend(q_content)
             report_lines.extend(["", "---", ""])
         
@@ -76,36 +77,40 @@ class ReportGenerator:
         print(f"报告已生成: {report_path}")
         return report_path
     
-    def _generate_question_section(self, week: int, index: int, q_id: str) -> List[str]:
+    def _generate_question_section(self, week: int, index: int, q_info: dict) -> List[str]:
         """
         生成单个题目的报告段落
         
         Args:
             week: 周次
             index: 题目序号（从1开始）
-            q_id: 原题号
+            q_info: 题目信息字典（包含id, folder, title）
             
         Returns:
             Markdown行列表
         """
-        lines = [f"## 题目 {index}/{self._get_total_questions(week)} (原题号: {q_id})"]
+        qid = q_info['id']
+        title = q_info.get('title', f'题目{index}')
         
-        # 1. 题目描述
-        question_md = self._load_question_markdown(week, q_id)
+        lines = [f"## 题目 {index} (ID: {qid})",
+                 f"**标题**: {title}",
+                 ""]
+        
+        # 1. 题目描述（使用ID目录）
+        question_md = self._load_question_markdown(week, qid)
         if question_md:
-            # 过滤图片
             question_md = self._filter_images(question_md)
-            lines.extend(["", "### 题目描述", "", question_md])
+            lines.extend(["### 题目描述", "", question_md])
         
-        # 2. 学生代码
-        code = self._load_student_code(week, index)
+        # 2. 学生代码（使用ID命名）
+        code = self._load_student_code(week, qid)
         if code:
             lines.extend(["", "### 学生代码", "", "```verilog", code, "```"])
         else:
             lines.extend(["", "### 学生代码", "", "*未提交代码*"])
         
-        # 3. 测试结果
-        result = self._load_test_result(week, index)
+        # 3. 测试结果（使用ID命名）
+        result = self._load_test_result(week, qid)
         if result:
             lines.extend(["", "### 测试结果", ""])
             
@@ -131,9 +136,9 @@ class ReportGenerator:
         
         return lines
     
-    def _load_question_markdown(self, week: int, q_id: str) -> str:
-        """加载题目描述"""
-        md_file = os.path.join(QUESTIONS_DIR, f"week{week}", q_id, "question.md")
+    def _load_question_markdown(self, week: int, qid: str) -> str:
+        """加载题目描述（使用ID作为目录名）"""
+        md_file = os.path.join(QUESTIONS_DIR, f"week{week}", qid, "question.md")
         if os.path.exists(md_file):
             with open(md_file, 'r', encoding='utf-8') as f:
                 return f.read()
@@ -141,22 +146,20 @@ class ReportGenerator:
     
     def _filter_images(self, markdown: str) -> str:
         """过滤Markdown中的图片语法"""
-        # 替换图片为占位符
-        # ![alt](url) -> [图片: alt]
         result = re.sub(r'!\[([^\]]*)\]\([^\)]+\)', r'[图片: \1]', markdown)
         return result
     
-    def _load_student_code(self, week: int, index: int) -> str:
-        """加载学生代码"""
-        code_file = os.path.join(SUBMISSIONS_DIR, f"week{week}", f"q_selected_{index}.v")
+    def _load_student_code(self, week: int, qid: str) -> str:
+        """加载学生代码（使用ID命名）"""
+        code_file = os.path.join(SUBMISSIONS_DIR, f"week{week}", f"{qid}.v")
         if os.path.exists(code_file):
             with open(code_file, 'r', encoding='utf-8') as f:
                 return f.read()
         return ""
     
-    def _load_test_result(self, week: int, index: int) -> Optional[Dict]:
-        """加载测试结果"""
-        result_file = os.path.join(SUBMISSIONS_DIR, f"week{week}", f"q_selected_{index}_result.json")
+    def _load_test_result(self, week: int, qid: str) -> Optional[Dict]:
+        """加载测试结果（使用ID命名）"""
+        result_file = os.path.join(SUBMISSIONS_DIR, f"week{week}", f"{qid}_result.json")
         if os.path.exists(result_file):
             with open(result_file, 'r', encoding='utf-8') as f:
                 return json.load(f)
@@ -168,9 +171,7 @@ class ReportGenerator:
         if not comparisons:
             return "无数据"
         
-        # 获取所有信号
         all_signals = result.get("signals", [])
-        output_signals = result.get("output_signals", [])
         
         # 构建表头
         headers = ["时间(ns)"] + all_signals + ["结果"]
@@ -194,15 +195,6 @@ class ReportGenerator:
             lines.append("| " + " | ".join(values) + " |")
         
         return "\n".join(lines)
-    
-    def _get_total_questions(self, week: int) -> int:
-        """获取题目总数"""
-        draw_file = os.path.join(QUESTIONS_DIR, f"week{week}", "draw_result.json")
-        if os.path.exists(draw_file):
-            with open(draw_file, 'r', encoding='utf-8') as f:
-                data = json.load(f)
-                return len(data.get("drawn_questions", []))
-        return 0
 
 
 # 单例实例

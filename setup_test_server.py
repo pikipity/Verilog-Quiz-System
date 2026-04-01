@@ -1,67 +1,77 @@
 """
-快速设置本地测试服务器
+快速设置本地测试服务器 - 使用新ID格式
 """
 import os
 import json
 import http.server
 import socketserver
-import threading
-import sys
+
+
+class ThreadedHTTPServer(socketserver.ThreadingMixIn, http.server.HTTPServer):
+    """多线程HTTP服务器"""
+    allow_reuse_address = True
+    daemon_threads = True
 
 
 def create_test_data():
-    """创建测试题目数据"""
+    """创建测试题目数据（使用新ID格式）"""
     base_dir = "test_server/verilog-quiz"
     os.makedirs(base_dir, exist_ok=True)
     
-    # manifest.json
-    manifest = {
-        "version": "1.0",
-        "weeks": ["week1"]
-    }
-    with open(f"{base_dir}/manifest.json", "w") as f:
-        json.dump(manifest, f, indent=2)
-    
-    # week1/info.json
-    week1_dir = f"{base_dir}/week1"
-    os.makedirs(week1_dir, exist_ok=True)
-    
-    info = {
-        "week": 1,
-        "title": "组合逻辑基础测试",
-        "start_date": "2026-04-01",
-        "end_date": "2026-04-07",
-        "total_questions": 3,
-        "select_count": 2,
-        "question_pool": ["q1", "q2", "q3"]
-    }
-    with open(f"{week1_dir}/info.json", "w") as f:
-        json.dump(info, f, indent=2)
-    
-    # 创建3道测试题
-    questions = [
+    # 定义题目（使用ID与folder分离）
+    questions_data = [
         {
-            "id": "q1",
+            "id": "mux2to1_v1",
+            "folder": "q1",
             "title": "2选1数据选择器",
             "module": "mux2to1",
             "ports": ["a", "b", "sel", "y"]
         },
         {
-            "id": "q2",
+            "id": "and2_v1",
+            "folder": "q2",
             "title": "2输入与门",
             "module": "and2",
             "ports": ["a", "b", "y"]
         },
         {
-            "id": "q3",
+            "id": "halfadder_v1",
+            "folder": "q3",
             "title": "半加器",
             "module": "half_adder",
             "ports": ["a", "b", "sum", "cout"]
         }
     ]
     
-    for q in questions:
-        q_dir = f"{week1_dir}/{q['id']}"
+    # manifest.json
+    manifest = {
+        "version": "1.0",
+        "weeks": ["week1"]
+    }
+    with open(f"{base_dir}/manifest.json", "w", encoding='utf-8') as f:
+        json.dump(manifest, f, indent=2)
+    
+    # week1/info.json（新格式，带时间戳）
+    week1_dir = f"{base_dir}/week1"
+    os.makedirs(week1_dir, exist_ok=True)
+    
+    from datetime import datetime
+    info = {
+        "week": 1,
+        "title": "组合逻辑基础测试",
+        "updated_at": datetime.now().strftime("%Y-%m-%dT%H:%M:%S"),
+        "questions": [
+            {"id": q['id'], "folder": q['folder'], "title": q['title']}
+            for q in questions_data
+        ],
+        "select_count": 2
+    }
+    with open(f"{week1_dir}/info.json", "w", encoding='utf-8') as f:
+        json.dump(info, f, ensure_ascii=False, indent=2)
+    
+    # 创建每道题的文件夹（使用folder名）
+    for q in questions_data:
+        q_dir = f"{week1_dir}/{q['folder']}"
         os.makedirs(q_dir, exist_ok=True)
         
         # question.md
@@ -78,11 +88,16 @@ def create_test_data():
             md_content += f"| {port} | input | 1 | 输入 |\n"
         md_content += f"| {q['ports'][-1]} | output | 1 | 输出 |\n"
         
-        with open(f"{q_dir}/question.md", "w") as f:
+        md_content += """
+## 提示
+使用assign语句实现
+"""
+        
+        with open(f"{q_dir}/question.md", "w", encoding='utf-8') as f:
             f.write(md_content)
         
         # reference.v
-        if q['id'] == 'q1':
+        if q['id'] == 'mux2to1_v1':
             ref = """module mux2to1(
     input a,
     input b,
@@ -92,7 +107,7 @@ def create_test_data():
     assign y = sel ? b : a;
 endmodule
 """
-        elif q['id'] == 'q2':
+        elif q['id'] == 'and2_v1':
             ref = """module and2(
     input a,
     input b,
@@ -113,7 +128,7 @@ endmodule
 endmodule
 """
         
-        with open(f"{q_dir}/reference.v", "w") as f:
+        with open(f"{q_dir}/reference.v", "w", encoding='utf-8') as f:
             f.write(ref)
         
         # testbench.v
@@ -171,16 +186,13 @@ module tb_{q['module']};
 endmodule
 """
         
-        with open(f"{q_dir}/testbench.v", "w") as f:
+        with open(f"{q_dir}/testbench.v", "w", encoding='utf-8') as f:
             f.write(tb)
     
     print(f"✓ 测试数据已创建: {base_dir}")
-
-
-class ThreadedHTTPServer(socketserver.ThreadingMixIn, http.server.HTTPServer):
-    """多线程HTTP服务器"""
-    allow_reuse_address = True
-    daemon_threads = True
+    print("  使用新ID格式:")
+    for q in questions_data:
+        print(f"    - {q['id']} (folder: {q['folder']})")
 
 
 def start_server():

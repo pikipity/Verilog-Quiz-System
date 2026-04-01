@@ -408,6 +408,94 @@ endmodule
 
 ---
 
+## 本地测试指南
+
+### 测试环境准备
+
+1. **安装iverilog**
+   - Windows: http://bleyer.co.uk/icarus/ 或 WSL (`sudo apt-get install iverilog`)
+   - Linux: `sudo apt-get install iverilog`
+   - macOS: `brew install icarus-verilog`
+
+2. **确保uv已安装**（项目使用uv管理Python环境）
+
+### 测试步骤
+
+需要同时运行两个程序：HTTP服务器（提供题目）和主程序（GUI界面）。
+
+#### 步骤1：启动测试服务器（提供题目下载）
+
+打开终端1，进入项目目录：
+
+```bash
+# 进入项目目录（根据实际路径修改）
+cd <项目目录>
+
+# 如果uv在PATH中
+uv run python setup_test_server.py
+
+# 如果uv不在PATH中，使用完整路径（根据实际安装位置修改）
+<uv完整路径> run python setup_test_server.py
+```
+
+看到以下输出表示服务器启动成功：
+```
+🚀 服务器启动: http://localhost:8080
+📁 题目地址: http://localhost:8080/verilog-quiz
+```
+
+**保持此终端运行，不要关闭！**
+
+#### 步骤2：运行主程序（GUI界面）
+
+打开终端2（新窗口），进入项目目录：
+
+```bash
+# 进入项目目录（根据实际路径修改）
+cd <项目目录>
+
+# 如果uv在PATH中
+uv run python main.py
+
+# 如果uv不在PATH中，使用完整路径（根据实际安装位置修改）
+<uv完整路径> run python main.py
+```
+
+#### 步骤3：功能测试流程
+
+1. **检查更新**：点击"检查更新"按钮
+   - 正常：弹出"发现新题目"对话框
+   - 如果显示"无法连接到服务器"，检查步骤1的服务器是否还在运行
+
+2. **下载题目**：点击"下载"
+   - 程序会自动抽题（从题库中随机抽取指定数量）
+   - 下载的题目会保存在 `questions/` 目录
+
+3. **开始答题**：选择周次，点击"开始"
+   - 左侧显示题目描述
+   - 右侧编写Verilog代码
+
+4. **运行测试**：编写代码后点击"运行测试"
+   - 程序调用iverilog编译
+   - 显示编译结果和数值对比
+
+5. **保存继续**：完成所有题目后生成报告
+
+### 常见问题
+
+**Q: 提示"无法连接到服务器"**
+- A: 检查步骤1的测试服务器是否还在运行
+- A: 检查 `config.py` 中的 `SERVER_URL` 是否为 `http://localhost:8080/verilog-quiz`
+
+**Q: 提示"未检测到iverilog"**
+- A: 确保iverilog已安装并添加到系统PATH
+- A: Windows用户可以尝试在WSL中安装iverilog
+
+**Q: 如何重新测试下载流程？**
+- A: 删除 `questions/` 目录下的内容（保留.gitkeep），重新点击"检查更新"
+
+---
+
 ## 跨平台iverilog调用策略
 
 ### 平台检测与调用优先级

@@ -12,7 +12,7 @@ def main(page: ft.Page):
 
 def run_app():
     """启动应用"""
-    ft.app(target=main)
+    ft.run(main)
 
 
 if __name__ == "__main__":
