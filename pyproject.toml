@@ -1,0 +1,17 @@
+[project]
+name = "verilog-quiz-system"
+version = "0.1.0"
+description = "Verilog作业考试系统 - 单机版GUI程序"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "cryptography>=46.0.6",
+    "flet>=0.83.1",
+    "flet-desktop>=0.83.1",
+    "requests>=2.33.1",
+]
+
+[dependency-groups]
+dev = [
+    "pyinstaller>=6.19.0",
+]

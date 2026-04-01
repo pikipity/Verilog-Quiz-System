@@ -1,0 +1,9 @@
+{
+  "week": 1,
+  "title": "组合逻辑基础测试",
+  "start_date": "2026-04-01",
+  "end_date": "2026-04-07",
+  "total_questions": 3,
+  "select_count": 2,
+  "question_pool": ["q1", "q2", "q3"]
+}
