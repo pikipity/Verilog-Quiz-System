@@ -52,31 +52,25 @@ class QuestionView:
         # 加载testbench代码
         testbench_code = self._load_testbench_code()
         
-        # 创建三列，都使用 expand=1 来三等分宽度
-        self.question_panel = self._build_question_panel()
-        self.editor_panel = self._build_editor_panel(existing_code)
-        self.testbench_panel = self._build_testbench_panel(testbench_code)
-        
+        # 单列垂直布局，整个页面可滚动
         return ft.Column(
             [
                 self._build_header(),
                 ft.Divider(height=1),
-                ft.Row(
-                    [
-                        ft.Container(self.question_panel, expand=1, height=None),
-                        ft.VerticalDivider(width=1),
-                        ft.Container(self.editor_panel, expand=1, height=None),
-                        ft.VerticalDivider(width=1),
-                        ft.Container(self.testbench_panel, expand=1, height=None),
-                    ],
-                    expand=True,
-                    spacing=0,
-                ),
+                # 题目描述
+                self._build_question_panel(),
                 ft.Divider(height=1),
+                # 代码编辑器
+                self._build_editor_panel(existing_code),
+                ft.Divider(height=1),
+                # 测试平台
+                self._build_testbench_panel(testbench_code),
+                ft.Divider(height=1),
+                # 底部按钮
                 self._build_footer(),
             ],
             expand=True,
-            spacing=0,
+            scroll=ft.ScrollMode.AUTO,
         )
     
     def _build_header(self) -> ft.Control:
@@ -125,43 +119,42 @@ class QuestionView:
         )
     
     def _build_question_panel(self) -> ft.Control:
-        """构建题目显示面板（左侧）"""
+        """构建题目显示面板"""
         question_md = self._load_question_markdown()
         
         return ft.Container(
             content=ft.Column(
                 [
-                    ft.Text("题目描述", size=18, weight=ft.FontWeight.BOLD),
+                    ft.Text("题目描述", size=16, weight=ft.FontWeight.BOLD),
                     ft.Divider(height=1),
-                    ft.Column(
-                        [ft.Markdown(
-                            question_md,
-                            selectable=True,
-                            extension_set=ft.MarkdownExtensionSet.GITHUB_WEB,
-                            code_theme=ft.MarkdownCodeTheme.GITHUB,
-                        )],
-                        expand=True,
-                        scroll=ft.ScrollMode.AUTO,
-                        spacing=5,
+                    ft.Markdown(
+                        question_md,
+                        selectable=True,
+                        extension_set=ft.MarkdownExtensionSet.GITHUB_WEB,
+                        code_theme=ft.MarkdownCodeTheme.GITHUB,
                     ),
                 ],
-                expand=True,
                 spacing=5,
             ),
-            expand=True,
             padding=10,
             border=ft.border.all(1, ft.Colors.GREY_300),
             border_radius=8,
         )
     
     def _build_editor_panel(self, existing_code: str) -> ft.Control:
-        """构建代码编辑面板（中间）"""
+        """构建代码编辑面板"""
         self.current_code = existing_code
+        
+        # 自动保存函数（当焦点移出时）
+        def on_blur_save(e):
+            """焦点移出时自动保存"""
+            if self._save_code():
+                print(f"自动保存: {self.question_id}.v")
         
         self.code_editor = ft.TextField(
             value=existing_code,
             multiline=True,
-            min_lines=10,
+            min_lines=15,
             max_lines=None,
             text_style=ft.TextStyle(
                 font_family=CODE_FONT,
@@ -170,61 +163,48 @@ class QuestionView:
             border_color=ft.Colors.BLUE_400,
             hint_text="在此编写Verilog代码...",
             on_change=self._on_code_change,
-            expand=True,
+            on_blur=on_blur_save,  # 焦点移出时自动保存
+            expand=True,  # 让TextField填充宽度
         )
         
         return ft.Container(
             content=ft.Column(
                 [
-                    ft.Text("代码编辑器", size=18, weight=ft.FontWeight.BOLD),
+                    ft.Text("代码编辑器", size=16, weight=ft.FontWeight.BOLD),
                     ft.Divider(height=1),
-                    ft.Column(
-                        [self.code_editor],
-                        expand=True,
-                        scroll=ft.ScrollMode.AUTO,
-                        spacing=5,
-                    ),
+                    self.code_editor,
                 ],
-                expand=True,
                 spacing=5,
             ),
-            expand=True,
             padding=10,
             border=ft.border.all(1, ft.Colors.BLUE_200),
             border_radius=8,
         )
     
     def _build_testbench_panel(self, testbench_code: str) -> ft.Control:
-        """构建testbench显示面板（右侧，只读）"""
+        """构建testbench显示面板（只读）"""
         return ft.Container(
             content=ft.Column(
                 [
-                    ft.Text("测试平台 (Testbench)", size=18, weight=ft.FontWeight.BOLD),
+                    ft.Text("测试平台 (Testbench)", size=16, weight=ft.FontWeight.BOLD),
                     ft.Divider(height=1),
-                    ft.Column(
-                        [ft.TextField(
-                            value=testbench_code,
-                            multiline=True,
-                            min_lines=10,
-                            max_lines=None,
-                            text_style=ft.TextStyle(
-                                font_family=CODE_FONT,
-                                size=CODE_FONT_SIZE,
-                            ),
-                            border_color=ft.Colors.GREY_400,
-                            read_only=True,
-                            bgcolor=ft.Colors.GREY_50,
-                            expand=True,
-                        )],
-                        expand=True,
-                        scroll=ft.ScrollMode.AUTO,
-                        spacing=5,
+                    ft.TextField(
+                        value=testbench_code,
+                        multiline=True,
+                        min_lines=10,
+                        max_lines=None,
+                        text_style=ft.TextStyle(
+                            font_family=CODE_FONT,
+                            size=CODE_FONT_SIZE,
+                        ),
+                        border_color=ft.Colors.GREY_400,
+                        read_only=True,
+                        bgcolor=ft.Colors.GREY_50,
+                        expand=True,  # 让TextField填充宽度
                     ),
                 ],
-                expand=True,
                 spacing=5,
             ),
-            expand=True,
             padding=10,
             border=ft.border.all(1, ft.Colors.GREY_300),
             border_radius=8,
@@ -245,7 +225,9 @@ class QuestionView:
         if os.path.exists(tb_path):
             try:
                 with open(tb_path, 'r', encoding='utf-8') as f:
-                    return f.read()
+                    content = f.read()
+                    # 统一换行符为 \n，避免 Windows \r\n 导致的多余空行
+                    return content.replace('\r\n', '\n')
             except Exception as e:
                 return f"// 读取testbench失败: {e}"
         
@@ -328,21 +310,24 @@ class QuestionView:
         return "# 题目文件不存在\n\n请检查更新。"
     
     def _load_existing_code(self) -> str:
-        """加载已有的代码（使用ID命名）"""
+        """加载已有的代码（使用ID命名，按题目子文件夹组织）"""
         if not self.question_id:
             return self._get_code_template()
         
-        # 使用ID作为文件名
+        # 使用ID作为子目录和文件名
         code_file = os.path.join(
             SUBMISSIONS_DIR,
             f"week{self.week}",
-            f"{self.question_id}.v"  # 使用ID命名
+            self.question_id,
+            f"{self.question_id}.v"
         )
         
         if os.path.exists(code_file):
             try:
                 with open(code_file, 'r', encoding='utf-8') as f:
-                    return f.read()
+                    content = f.read()
+                    # 统一换行符为 \n，避免 Windows \r\n 导致的多余空行
+                    return content.replace('\r\n', '\n')
             except Exception as e:
                 print(f"读取已有代码失败: {e}")
         
@@ -363,26 +348,32 @@ endmodule
     
     def _on_code_change(self, e):
         """代码改变事件"""
-        self.current_code = e.control.value
+        self._update_code_status(e.control.value)
+    
+    def _update_code_status(self, value: str):
+        """更新代码状态"""
+        self.current_code = value
         self.status_text.value = "有未保存的更改"
         self.status_text.color = ft.Colors.ORANGE
         self.status_text.update()
     
     def _save_code(self) -> bool:
-        """保存代码（使用ID命名）"""
+        """保存代码（使用ID命名，按题目子文件夹组织）"""
         if not self.question_id:
             return False
         
-        # 确保目录存在
-        week_dir = os.path.join(SUBMISSIONS_DIR, f"week{self.week}")
-        os.makedirs(week_dir, exist_ok=True)
+        # 确保目录存在：submissions/weekX/question_id/
+        question_dir = os.path.join(SUBMISSIONS_DIR, f"week{self.week}", self.question_id)
+        os.makedirs(question_dir, exist_ok=True)
         
-        # 保存代码文件（使用ID作为文件名）
-        code_file = os.path.join(week_dir, f"{self.question_id}.v")
+        # 保存代码文件
+        code_file = os.path.join(question_dir, f"{self.question_id}.v")
         
         try:
-            with open(code_file, 'w', encoding='utf-8') as f:
-                f.write(self.current_code)
+            # 保存时统一使用 \n 作为换行符
+            normalized_code = self.current_code.replace('\r\n', '\n').replace('\r', '\n')
+            with open(code_file, 'w', encoding='utf-8', newline='\n') as f:
+                f.write(normalized_code)
             
             # 更新进度
             self._update_progress()
@@ -399,11 +390,13 @@ endmodule
             return False
     
     def _update_progress(self):
-        """更新进度文件（使用ID记录）"""
-        week_dir = os.path.join(SUBMISSIONS_DIR, f"week{self.week}")
-        progress_file = os.path.join(week_dir, "progress.json")
+        """更新进度文件（使用ID记录，保存在题目子文件夹中）"""
+        question_dir = os.path.join(SUBMISSIONS_DIR, f"week{self.week}", self.question_id)
+        os.makedirs(question_dir, exist_ok=True)
         
-        progress_data = {"questions": {}}  # 改为字典，以ID为key
+        progress_file = os.path.join(question_dir, "progress.json")
+        
+        progress_data = {}
         
         # 读取现有进度
         if os.path.exists(progress_file):
@@ -413,17 +406,14 @@ endmodule
             except Exception:
                 pass
         
-        # 确保questions字段存在
-        if "questions" not in progress_data:
-            progress_data["questions"] = {}
-        
-        # 更新当前题目状态（使用ID作为key）
-        progress_data["questions"][self.question_id] = {
+        # 更新当前题目状态
+        progress_data.update({
+            "question_id": self.question_id,
             "index": self.question_index,
             "title": self.question_info.get('title', '') if self.question_info else '',
             "status": "in_progress",
             "last_save": datetime.now().isoformat(),
-        }
+        })
         
         try:
             with open(progress_file, 'w', encoding='utf-8') as f:
@@ -441,35 +431,77 @@ endmodule
         self._run_test_workflow()
     
     def _run_test_workflow(self):
-        """运行完整测试流程"""
-        import tempfile
+        """运行完整测试流程（临时文件放在submissions对应题目目录下）"""
+        import threading
         
-        self.status_text.value = "正在运行测试..."
-        self.status_text.color = ft.Colors.BLUE
-        self.status_text.update()
+        # 显示加载遮罩
+        loading_text = ft.Text("正在准备测试环境...", size=16, color=ft.Colors.WHITE)
+        loading_overlay = ft.Container(
+            content=ft.Column(
+                [
+                    ft.ProgressRing(width=50, height=50, stroke_width=4),
+                    loading_text,
+                ],
+                alignment=ft.MainAxisAlignment.CENTER,
+                horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+                spacing=20,
+            ),
+            bgcolor=ft.Colors.BLACK54,
+            alignment=ft.Alignment.CENTER,
+            expand=True,
+        )
+        self.app.page.overlay.append(loading_overlay)
+        self.app.page.update()
         
-        # 1. 获取参考代码
-        ref_code = question_manager.get_reference_code(self.week, self.question_id)
-        if ref_code is None:
-            self.app.show_snackbar("无法获取参考答案", ft.Colors.RED)
-            self.status_text.value = "测试失败"
-            self.status_text.color = ft.Colors.RED
-            self.status_text.update()
-            return
+        def update_message(msg: str):
+            """更新进度消息（线程安全）"""
+            def _update():
+                loading_text.value = msg
+                self.app.page.update()
+            self.app.page.run_thread(_update)
         
-        # 2. 创建临时工作目录
-        with tempfile.TemporaryDirectory() as temp_dir:
+        def show_snackbar_safe(text, color):
+            """安全显示提示"""
+            def _show():
+                self.app.show_snackbar(text, color)
+            self.app.page.run_thread(_show)
+        
+        def close_overlay():
+            """关闭遮罩"""
+            def _close():
+                try:
+                    if loading_overlay in self.app.page.overlay:
+                        self.app.page.overlay.remove(loading_overlay)
+                        self.app.page.update()
+                except Exception:
+                    pass
+            self.app.page.run_thread(_close)
+        
+        def run_test_thread():
+            """在后台线程中运行测试"""
             try:
-                # 3. 读取testbench（使用ID目录）
-                tb_path = os.path.join(
-                    QUESTIONS_DIR, 
-                    f"week{self.week}", 
-                    self.question_id,
-                    "testbench.v"
-                )
+                # 1. 获取参考代码
+                update_message("正在获取参考答案...")
+                ref_code = question_manager.get_reference_code(self.week, self.question_id)
+                
+                # 2. 创建临时工作目录
+                update_message("正在准备仿真环境...")
+                question_dir = os.path.join(SUBMISSIONS_DIR, f"week{self.week}", self.question_id)
+                temp_dir = os.path.join(question_dir, "temp")
+                os.makedirs(temp_dir, exist_ok=True)
+                
+                if ref_code is None:
+                    show_snackbar_safe("无法获取参考答案", ft.Colors.RED)
+                    close_overlay()
+                    return
+                
+                # 3. 读取testbench
+                update_message("正在读取测试平台...")
+                tb_path = os.path.join(QUESTIONS_DIR, f"week{self.week}", self.question_id, "testbench.v")
                 
                 if not os.path.exists(tb_path):
-                    self.app.show_snackbar("未找到testbench文件", ft.Colors.RED)
+                    show_snackbar_safe("未找到testbench文件", ft.Colors.RED)
+                    close_overlay()
                     return
                 
                 with open(tb_path, 'r', encoding='utf-8') as f:
@@ -485,45 +517,61 @@ endmodule
                 with open(ref_file, 'w', encoding='utf-8') as f:
                     f.write(ref_code)
                 
-                # 6. 执行参考代码测试（获取期望输出）
-                ref_result = code_executor.execute(
-                    [ref_file, tb_path],
-                    temp_dir,
-                    "ref.vvp"
-                )
+                # 6. 执行参考代码测试
+                update_message("正在运行参考答案仿真...")
+                ref_result = code_executor.execute([ref_file, tb_path], temp_dir, "ref.vvp")
                 
                 # 7. 执行学生代码测试
-                student_result = code_executor.execute(
-                    [student_file, tb_path],
-                    temp_dir,
-                    "student.vvp"
-                )
+                update_message("正在运行学生代码仿真...")
+                student_result = code_executor.execute([student_file, tb_path], temp_dir, "student.vvp")
                 
                 # 8. 保存结果
+                update_message("正在保存测试结果...")
                 self._save_test_result(student_result)
                 
-                # 9. 显示详细结果对话框
-                self._show_test_result_dialog(student_result, ref_result, testbench)
-                
-                # 更新状态
-                if student_result.compile_success:
-                    if student_result.run_success:
-                        self.status_text.value = "测试完成"
-                        self.status_text.color = ft.Colors.GREEN
+                # 9. 显示结果和更新UI（在主线程中）
+                def update_ui():
+                    self._show_test_result_dialog(student_result, ref_result, testbench)
+                    
+                    if student_result.compile_success:
+                        if student_result.run_success:
+                            self.status_text.value = "测试完成"
+                            self.status_text.color = ft.Colors.GREEN
+                        else:
+                            self.status_text.value = "运行失败"
+                            self.status_text.color = ft.Colors.RED
                     else:
-                        self.status_text.value = "运行失败"
+                        self.status_text.value = "编译失败"
                         self.status_text.color = ft.Colors.RED
-                else:
-                    self.status_text.value = "编译失败"
-                    self.status_text.color = ft.Colors.RED
+                    
+                    self.status_text.update()
+                    close_overlay()
+                    
+                    # 清理临时文件（只保留.vcd）
+                    try:
+                        if os.path.exists(temp_dir):
+                            for filename in os.listdir(temp_dir):
+                                if not filename.endswith('.vcd'):
+                                    try:
+                                        os.remove(os.path.join(temp_dir, filename))
+                                    except:
+                                        pass
+                    except:
+                        pass
                 
-                self.status_text.update()
+                self.app.page.run_thread(update_ui)
                 
             except Exception as e:
-                self.app.show_snackbar(f"测试异常: {str(e)}", ft.Colors.RED)
-                self.status_text.value = "测试失败"
-                self.status_text.color = ft.Colors.RED
-                self.status_text.update()
+                def show_error():
+                    self.app.show_snackbar(f"测试异常: {str(e)}", ft.Colors.RED)
+                    self.status_text.value = "测试失败"
+                    self.status_text.color = ft.Colors.RED
+                    self.status_text.update()
+                    close_overlay()
+                self.app.page.run_thread(show_error)
+        
+        # 启动后台线程运行测试
+        threading.Thread(target=run_test_thread, daemon=True).start()
     
     def _extract_input_output_signals(self, testbench: str) -> tuple:
         """从testbench中提取输入信号和输出信号名
@@ -953,7 +1001,7 @@ endmodule
         return signals
     
     def _save_test_result(self, exec_result: ExecutionResult):
-        """保存测试结果（使用ID命名）"""
+        """保存测试结果（使用ID命名，按题目子文件夹组织）"""
         result_data = {
             "test_time": datetime.now().isoformat(),
             "question_id": self.question_id,
@@ -964,12 +1012,11 @@ endmodule
             "vcd_file": exec_result.vcd_file,
         }
         
-        # 使用ID作为文件名
-        result_file = os.path.join(
-            SUBMISSIONS_DIR,
-            f"week{self.week}",
-            f"{self.question_id}_result.json"
-        )
+        # 使用ID作为子目录
+        question_dir = os.path.join(SUBMISSIONS_DIR, f"week{self.week}", self.question_id)
+        os.makedirs(question_dir, exist_ok=True)
+        
+        result_file = os.path.join(question_dir, "result.json")
         
         try:
             with open(result_file, 'w', encoding='utf-8') as f:
@@ -992,26 +1039,35 @@ endmodule
                 self._show_report_dialog()
     
     def _mark_week_completed(self):
-        """标记本周已完成"""
+        """标记本周已完成（遍历所有题目子文件夹）"""
         week_dir = os.path.join(SUBMISSIONS_DIR, f"week{self.week}")
-        progress_file = os.path.join(week_dir, "progress.json")
         
-        if os.path.exists(progress_file):
-            try:
-                with open(progress_file, 'r', encoding='utf-8') as f:
-                    progress_data = json.load(f)
-                
-                questions = progress_data.get("questions", {})
-                for qid in questions:
-                    if questions[qid].get("status") != "completed":
-                        questions[qid]["status"] = "completed"
-                
-                progress_data["questions"] = questions
-                
-                with open(progress_file, 'w', encoding='utf-8') as f:
-                    json.dump(progress_data, f, ensure_ascii=False, indent=2)
-            except Exception as e:
-                print(f"标记完成状态失败: {e}")
+        if not os.path.exists(week_dir):
+            return
+            
+        try:
+            # 遍历所有题目子文件夹
+            for qid in os.listdir(week_dir):
+                q_dir = os.path.join(week_dir, qid)
+                if not os.path.isdir(q_dir):
+                    continue
+                    
+                progress_file = os.path.join(q_dir, "progress.json")
+                if os.path.exists(progress_file):
+                    try:
+                        with open(progress_file, 'r', encoding='utf-8') as f:
+                            progress_data = json.load(f)
+                        
+                        if progress_data.get("status") != "completed":
+                            progress_data["status"] = "completed"
+                            progress_data["completed_at"] = datetime.now().isoformat()
+                            
+                            with open(progress_file, 'w', encoding='utf-8') as f:
+                                json.dump(progress_data, f, ensure_ascii=False, indent=2)
+                    except Exception as e:
+                        print(f"标记题目 {qid} 完成状态失败: {e}")
+        except Exception as e:
+            print(f"标记完成状态失败: {e}")
     
     def _show_report_dialog(self):
         """显示生成报告对话框"""

@@ -27,7 +27,11 @@ module tb_mux2to1;
         #10 a=0; b=1; sel=0;
         #1 $display("time=%0t a=%b b=%b sel=%b y=%b", $time, a, b, sel, y);
 
-        #10 $display("=== Test End ===");
+        // Test case 3
+        #10 a=0; b=1; sel=1;
+        #1 $display("time=%0t a=%b b=%b sel=%b y=%b", $time, a, b, sel, y);
+
+        #20 $display("=== Test End ===");
         $finish;
     end
 endmodule

@@ -1,11 +1,23 @@
 {
   "week": 1,
   "title": "组合逻辑基础测试",
-  "updated_at": "2026-04-05T12:00:00",
+  "updated_at": "2026-04-17T10:07:38",
   "questions": [
-    {"id": "mux2to1_v1", "folder": "q1", "title": "2选1数据选择器"},
-    {"id": "and2_v1", "folder": "q2", "title": "2输入与门"},
-    {"id": "halfadder_v1", "folder": "q3", "title": "半加器"}
+    {
+      "id": "mux2to1_v1",
+      "folder": "q1",
+      "title": "2选1数据选择器"
+    },
+    {
+      "id": "and2_v1",
+      "folder": "q2",
+      "title": "2输入与门"
+    },
+    {
+      "id": "halfadder_v1",
+      "folder": "q3",
+      "title": "半加器"
+    }
   ],
-  "select_count": 2
+  "select_count": 3
 }

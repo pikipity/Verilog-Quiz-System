@@ -150,16 +150,16 @@ class ReportGenerator:
         return result
     
     def _load_student_code(self, week: int, qid: str) -> str:
-        """加载学生代码（使用ID命名）"""
-        code_file = os.path.join(SUBMISSIONS_DIR, f"week{week}", f"{qid}.v")
+        """加载学生代码（使用ID命名，按题目子文件夹组织）"""
+        code_file = os.path.join(SUBMISSIONS_DIR, f"week{week}", qid, f"{qid}.v")
         if os.path.exists(code_file):
             with open(code_file, 'r', encoding='utf-8') as f:
                 return f.read()
         return ""
     
     def _load_test_result(self, week: int, qid: str) -> Optional[Dict]:
-        """加载测试结果（使用ID命名）"""
-        result_file = os.path.join(SUBMISSIONS_DIR, f"week{week}", f"{qid}_result.json")
+        """加载测试结果（使用ID命名，按题目子文件夹组织）"""
+        result_file = os.path.join(SUBMISSIONS_DIR, f"week{week}", qid, "result.json")
         if os.path.exists(result_file):
             with open(result_file, 'r', encoding='utf-8') as f:
                 return json.load(f)

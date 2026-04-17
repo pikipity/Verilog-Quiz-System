@@ -244,11 +244,16 @@ class QuestionManager:
                 
                 local_path = os.path.join(q_dir, local_name)
                 
+                # 显式使用UTF-8解码，避免编码检测错误
+                response.encoding = 'utf-8'
+                # 统一换行符为 \n
+                content = response.text.replace('\r\n', '\n').replace('\r', '\n')
+                
                 if remote_name == "reference.v":
                     # 加密保存参考答案
                     temp_path = local_path + ".tmp"
-                    with open(temp_path, 'w', encoding='utf-8') as f:
-                        f.write(response.text)
+                    with open(temp_path, 'w', encoding='utf-8', newline='\n') as f:
+                        f.write(content)
                     
                     encrypted_path = local_path + ".enc"
                     crypto_manager.encrypt_file(temp_path, encrypted_path)
@@ -256,8 +261,8 @@ class QuestionManager:
                     print(f"已加密保存: {qid}/reference.v.enc")
                 else:
                     # 明文保存其他文件
-                    with open(local_path, 'w', encoding='utf-8') as f:
-                        f.write(response.text)
+                    with open(local_path, 'w', encoding='utf-8', newline='\n') as f:
+                        f.write(content)
             
             return True
             

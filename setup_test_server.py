@@ -13,6 +13,26 @@ class ThreadedHTTPServer(socketserver.ThreadingMixIn, http.server.HTTPServer):
     daemon_threads = True
 
 
+class UTF8HTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
+    """支持UTF-8编码的HTTP请求处理器"""
+    
+    def guess_type(self, path):
+        # 根据文件扩展名返回正确的MIME类型（带UTF-8编码）
+        if path.endswith('.json'):
+            return 'application/json; charset=utf-8'
+        elif path.endswith('.md'):
+            return 'text/markdown; charset=utf-8'
+        elif path.endswith('.v'):
+            return 'text/plain; charset=utf-8'
+        elif path.endswith('.html') or path.endswith('.htm'):
+            return 'text/html; charset=utf-8'
+        elif path.endswith('.css'):
+            return 'text/css; charset=utf-8'
+        elif path.endswith('.js'):
+            return 'application/javascript; charset=utf-8'
+        return super().guess_type(path)
+
+
 def create_test_data():
     """创建测试题目数据（使用新ID格式）"""
     base_dir = "test_server/verilog-quiz"
@@ -200,7 +220,7 @@ def start_server():
     os.chdir("test_server")
     
     PORT = 8080
-    Handler = http.server.SimpleHTTPRequestHandler
+    Handler = UTF8HTTPRequestHandler
     
     httpd = ThreadedHTTPServer(("", PORT), Handler)
     
