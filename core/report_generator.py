@@ -114,23 +114,32 @@ class ReportGenerator:
         if result:
             lines.extend(["", "### 测试结果", ""])
             
-            if result.get("success"):
-                all_match = result.get("all_match", False)
-                status = "✅ 通过" if all_match else "❌ 未通过"
-                lines.append(f"**状态**: {status}")
+            # 检查编译和运行状态
+            compile_success = result.get("compile_success", False)
+            run_success = result.get("run_success", False)
+            
+            if not compile_success:
+                error = result.get("error", "编译失败")
+                lines.append(f"**状态**: ❌ 编译失败")
+                if error:
+                    lines.append(f"**错误**: {error}")
+            elif not run_success:
+                error = result.get("error", "运行失败")
+                lines.append(f"**状态**: ❌ 运行失败")
+                if error:
+                    lines.append(f"**错误**: {error}")
+            else:
+                # 编译和运行都成功
+                lines.append(f"**状态**: ✅ 测试完成")
                 lines.append("")
                 
-                # 添加数值对比表格
-                comparisons = result.get("comparisons", [])
-                if comparisons:
-                    lines.append("**数值对比**:")
-                    lines.append("")
-                    table = self._format_result_table(result)
-                    lines.append(table)
-            else:
-                error = result.get("error_message", "未知错误")
-                lines.append(f"**状态**: ❌ 测试失败")
-                lines.append(f"**错误**: {error}")
+                # 添加仿真输出（如果有）
+                output = result.get("output", "")
+                if output:
+                    lines.append("**仿真输出**:")
+                    lines.append("```")
+                    lines.append(output[:500] if len(output) > 500 else output)
+                    lines.append("```")
         else:
             lines.extend(["", "### 测试结果", "", "*尚未测试*"])
         

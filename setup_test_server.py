@@ -71,31 +71,38 @@ def create_test_data():
     with open(f"{base_dir}/manifest.json", "w", encoding='utf-8') as f:
         json.dump(manifest, f, indent=2)
     
-    # week1/info.json（新格式，带时间戳）
+    # week1/info.json（新格式，带时间戳）- 只在不存在时创建
     week1_dir = f"{base_dir}/week1"
     os.makedirs(week1_dir, exist_ok=True)
     
-    from datetime import datetime
-    info = {
-        "week": 1,
-        "title": "组合逻辑基础测试",
-        "updated_at": datetime.now().strftime("%Y-%m-%dT%H:%M:%S"),
-        "questions": [
-            {"id": q['id'], "folder": q['folder'], "title": q['title']}
-            for q in questions_data
-        ],
-        "select_count": 2
-    }
-    with open(f"{week1_dir}/info.json", "w", encoding='utf-8') as f:
-        json.dump(info, f, ensure_ascii=False, indent=2)
+    info_file = f"{week1_dir}/info.json"
+    if not os.path.exists(info_file):
+        from datetime import datetime
+        info = {
+            "week": 1,
+            "title": "组合逻辑基础测试",
+            "updated_at": datetime.now().strftime("%Y-%m-%dT%H:%M:%S"),
+            "questions": [
+                {"id": q['id'], "folder": q['folder'], "title": q['title']}
+                for q in questions_data
+            ],
+            "select_count": 2
+        }
+        with open(info_file, "w", encoding='utf-8') as f:
+            json.dump(info, f, ensure_ascii=False, indent=2)
+        print(f"Created: {info_file}")
+    else:
+        print(f"Skipped (exists): {info_file}")
     
     # 创建每道题的文件夹（使用folder名）
     for q in questions_data:
         q_dir = f"{week1_dir}/{q['folder']}"
         os.makedirs(q_dir, exist_ok=True)
         
-        # question.md
-        md_content = f"""# 题目：{q['title']}
+        # question.md - 只在不存在时创建
+        md_file = f"{q_dir}/question.md"
+        if not os.path.exists(md_file):
+            md_content = f"""# 题目：{q['title']}
 
 实现一个{q['title']}。
 
@@ -104,21 +111,23 @@ def create_test_data():
 | 端口 | 方向 | 位宽 | 说明 |
 |------|------|------|------|
 """
-        for port in q['ports'][:-1]:
-            md_content += f"| {port} | input | 1 | 输入 |\n"
-        md_content += f"| {q['ports'][-1]} | output | 1 | 输出 |\n"
-        
-        md_content += """
+            for port in q['ports'][:-1]:
+                md_content += f"| {port} | input | 1 | 输入 |\n"
+            md_content += f"| {q['ports'][-1]} | output | 1 | 输出 |\n"
+            
+            md_content += """
 ## 提示
 使用assign语句实现
 """
+            with open(md_file, "w", encoding='utf-8') as f:
+                f.write(md_content)
+            print(f"Created: {md_file}")
         
-        with open(f"{q_dir}/question.md", "w", encoding='utf-8') as f:
-            f.write(md_content)
-        
-        # reference.v
-        if q['id'] == 'mux2to1_v1':
-            ref = """module mux2to1(
+        # reference.v - 只在不存在时创建
+        ref_file = f"{q_dir}/reference.v"
+        if not os.path.exists(ref_file):
+            if q['id'] == 'mux2to1_v1':
+                ref = """module mux2to1(
     input a,
     input b,
     input sel,
@@ -127,8 +136,8 @@ def create_test_data():
     assign y = sel ? b : a;
 endmodule
 """
-        elif q['id'] == 'and2_v1':
-            ref = """module and2(
+            elif q['id'] == 'and2_v1':
+                ref = """module and2(
     input a,
     input b,
     output y
@@ -136,8 +145,8 @@ endmodule
     assign y = a & b;
 endmodule
 """
-        else:
-            ref = """module half_adder(
+            else:
+                ref = """module half_adder(
     input a,
     input b,
     output sum,
@@ -147,25 +156,27 @@ endmodule
     assign cout = a & b;
 endmodule
 """
+            with open(ref_file, "w", encoding='utf-8') as f:
+                f.write(ref)
+            print(f"Created: {ref_file}")
         
-        with open(f"{q_dir}/reference.v", "w", encoding='utf-8') as f:
-            f.write(ref)
-        
-        # testbench.v
-        tb = f"""`timescale 1ns/1ps
+        # testbench.v - 只在不存在时创建
+        tb_file = f"{q_dir}/testbench.v"
+        if not os.path.exists(tb_file):
+            tb = f"""`timescale 1ns/1ps
 
 module tb_{q['module']};
 """
-        for port in q['ports'][:-1]:
-            tb += f"    reg {port};\n"
-        tb += f"    wire {q['ports'][-1]};\n\n"
-        
-        tb += f"    {q['module']} dut (\n"
-        for port in q['ports']:
-            tb += f"        .{port}({port}),\n"
-        tb = tb.rstrip(",\n") + "\n    );\n\n"
-        
-        tb += """    initial begin
+            for port in q['ports'][:-1]:
+                tb += f"    reg {port};\n"
+            tb += f"    wire {q['ports'][-1]};\n\n"
+            
+            tb += f"    {q['module']} dut (\n"
+            for port in q['ports']:
+                tb += f"        .{port}({port}),\n"
+            tb = tb.rstrip(",\n") + "\n    );\n\n"
+            
+            tb += """    initial begin
         $dumpfile("wave.vcd");
         $dumpvars(0, tb_""" + q['module'] + """);
         
@@ -173,41 +184,42 @@ module tb_{q['module']};
         
         // Test case 1
         #0 """
-        
-        for port in q['ports'][:-1]:
-            tb += f"{port}=0; "
-        tb = tb.rstrip() + "\n"
-        tb += "        #1 $display(\"time=%0t"
-        for port in q['ports']:
-            tb += f" {port}=%b"
-        tb += "\","
-        tb += " $time"
-        for port in q['ports']:
-            tb += f", {port}"
-        tb += ");\n\n"
-        
-        tb += """        // Test case 2
+            
+            for port in q['ports'][:-1]:
+                tb += f"{port}=0; "
+            tb = tb.rstrip() + "\n"
+            tb += "        #1 $display(\"time=%0t"
+            for port in q['ports']:
+                tb += f" {port}=%b"
+            tb += "\","
+            tb += " $time"
+            for port in q['ports']:
+                tb += f", {port}"
+            tb += ");\n\n"
+            
+            tb += """        // Test case 2
         #10 """
-        for i, port in enumerate(q['ports'][:-1]):
-            tb += f"{port}={i%2}; "
-        tb = tb.rstrip() + "\n"
-        tb += "        #1 $display(\"time=%0t"
-        for port in q['ports']:
-            tb += f" {port}=%b"
-        tb += "\","
-        tb += " $time"
-        for port in q['ports']:
-            tb += f", {port}"
-        tb += ");\n\n"
-        
-        tb += """        #10 $display("=== Test End ===");
+            for i, port in enumerate(q['ports'][:-1]):
+                tb += f"{port}={i%2}; "
+            tb = tb.rstrip() + "\n"
+            tb += "        #1 $display(\"time=%0t"
+            for port in q['ports']:
+                tb += f" {port}=%b"
+            tb += "\","
+            tb += " $time"
+            for port in q['ports']:
+                tb += f", {port}"
+            tb += ");\n\n"
+            
+            tb += """        #10 $display("=== Test End ===");
         $finish;
     end
 endmodule
 """
-        
-        with open(f"{q_dir}/testbench.v", "w", encoding='utf-8') as f:
-            f.write(tb)
+            
+            with open(tb_file, "w", encoding='utf-8') as f:
+                f.write(tb)
+            print(f"Created: {tb_file}")
     
     print(f"✓ 测试数据已创建: {base_dir}")
     print("  使用新ID格式:")

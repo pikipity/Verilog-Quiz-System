@@ -241,12 +241,21 @@ class QuestionView:
             color=ft.Colors.GREY,
         )
         
+        # 判断是否是第一题
+        is_first = self.question_index == 0
+        
         return ft.Container(
             content=ft.Row(
                 [
                     self.status_text,
                     ft.Row(
                         [
+                            ft.ElevatedButton(
+                                "上一题",
+                                icon=ft.Icons.ARROW_BACK,
+                                on_click=self._on_prev_question,
+                                disabled=is_first,
+                            ),
                             ft.ElevatedButton(
                                 "运行测试",
                                 icon=ft.Icons.PLAY_ARROW,
@@ -1037,6 +1046,11 @@ endmodule
                 self._mark_week_completed()
                 self.app.show_snackbar("本周作业已完成！请生成报告。", ft.Colors.GREEN)
                 self._show_report_dialog()
+    
+    def _on_prev_question(self, e):
+        """上一题按钮点击"""
+        if self.question_index > 0:
+            self.app.navigate_to_question(self.question_index - 1)
     
     def _mark_week_completed(self):
         """标记本周已完成（遍历所有题目子文件夹）"""
