@@ -1,0 +1,96 @@
+name: Build Release
+
+# 触发条件：只有 main 分支的 push 才触发（包括 PR 合并）
+on:
+  push:
+    branches:
+      - main
+
+  # 允许手动触发
+  workflow_dispatch:
+
+# 权限设置
+permissions:
+  contents: write    # 用于创建 Release
+  actions: read
+
+jobs:
+  build:
+    name: Build ${{ matrix.target }}
+    strategy:
+      fail-fast: false    # 一个平台失败不影响其他平台
+      matrix:
+        include:
+          - os: windows-latest
+            target: windows
+            ext: .exe
+          - os: ubuntu-20.04
+            target: linux
+            ext: ''
+          - os: macos-latest
+            target: macos
+            ext: ''
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      # ========== 1. 检出代码 ==========
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # ========== 2. 设置 Python ==========
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      # ========== 3. 安装依赖 ==========
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pyinstaller flet cryptography requests
+
+      # ========== 4. 打包可执行文件 ==========
+      - name: Build executable
+        run: |
+          pyinstaller --onefile --name verilog-quiz-${{ matrix.target }} --clean main.py
+
+      # ========== 5. 上传构建产物 ==========
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: verilog-quiz-${{ matrix.target }}
+          path: dist/*
+          retention-days: 30
+
+      # ========== 6. 创建 Release ==========
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v1.0.${{ github.run_number }}
+          name: Release v1.0.${{ github.run_number }}
+          body: |
+            ## Verilog Quiz System v1.0.${{ github.run_number }}
+
+            自动构建版本
+
+            ### 构建信息
+            - 提交: ${{ github.sha }}
+            - 提交者: ${{ github.event.head_commit.author.name }}
+            - 提交信息: ${{ github.event.head_commit.message }}
+            - 构建时间: ${{ github.event.head_commit.timestamp }}
+
+            ### 下载说明
+            - `verilog-quiz-windows.exe`: Windows 版本
+            - `verilog-quiz-linux`: Linux (Ubuntu) 版本
+            - `verilog-quiz-macos`: macOS 版本
+
+            ### 使用说明
+            1. 下载对应平台的可执行文件
+            2. Windows 直接双击运行
+            3. Linux/macOS 需要先赋予执行权限：`chmod +x verilog-quiz-linux`
+          files: dist/*
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

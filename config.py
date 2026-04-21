@@ -9,10 +9,10 @@ APP_NAME = "Verilog作业系统"
 
 # 服务器配置
 # 本地测试服务器（运行 setup_test_server.py 后使用）
-SERVER_URL = "http://localhost:8080/verilog-quiz"
+# SERVER_URL = "http://localhost:8080/verilog-quiz"
 
 # 生产环境服务器（部署后修改）
-# SERVER_URL = "https://your-server.com/verilog-quiz"
+SERVER_URL = "http://zewang.site/verilog-quiz/Verilog-Quiz-Questions/"
 
 # 本地路径配置
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))

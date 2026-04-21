@@ -1,0 +1,51 @@
+name: Build Dev
+
+# 触发条件：除 main 分支外的其他分支 push	on:
+  push:
+    branches-ignore:
+      - main
+
+  # 允许手动触发
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build ${{ matrix.target }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            target: windows
+          - os: ubuntu-20.04
+            target: linux
+          - os: macos-latest
+            target: macos
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pyinstaller flet cryptography requests
+
+      - name: Build executable
+        run: |
+          pyinstaller --onefile --name verilog-quiz-${{ matrix.target }}-dev --clean main.py
+
+      # 开发版本只上传 artifact，不创建 Release
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: verilog-quiz-${{ matrix.target }}-dev
+          path: dist/*
+          retention-days: 7    # 开发版本只保留7天
