@@ -1,0 +1,13 @@
+{
+  "week": 2,
+  "title": "测试2",
+  "updated_at": "2026-04-21T11:30:38",
+  "questions": [
+    {
+      "id": "mux2to1_v1",
+      "folder": "q1",
+      "title": "2选1数据选择器"
+    }
+  ],
+  "select_count": 1
+}

@@ -90,8 +90,6 @@ class WeekSelector:
         """构建单个周次卡片"""
         week = week_info["week"]
         title = week_info.get("title", f"第{week}周")
-        start_date = week_info.get("start_date", "")
-        end_date = week_info.get("end_date", "")
         
         # 检查该周的进度
         progress = self._get_week_progress(week)
@@ -102,7 +100,7 @@ class WeekSelector:
         is_completed = completed >= total and total > 0
         is_in_progress = completed > 0 and not is_completed
         
-        # 状态颜色和图标
+        # 状态颜色和图标（未开始不显示状态）
         if is_completed:
             status_color = ft.Colors.GREEN
             status_icon = ft.Icons.CHECK_CIRCLE
@@ -116,8 +114,34 @@ class WeekSelector:
         else:
             status_color = ft.Colors.BLUE
             status_icon = ft.Icons.RADIO_BUTTON_OFF
-            status_text = f"未开始 0/{total}"
+            status_text = f"未开始 0/{total}"  # 显示未开始状态
             action_text = "开始"
+        
+        # 构建左侧信息列
+        left_column_items = [
+            ft.Text(
+                f"Week {week}: {title}",
+                size=20,
+                weight=ft.FontWeight.BOLD,
+            ),
+        ]
+        
+        # 只有非未开始状态才显示状态行
+        if status_text:
+            left_column_items.append(
+                ft.Row(
+                    [
+                        ft.Icon(status_icon, color=status_color, size=20),
+                        ft.Text(
+                            status_text,
+                            size=14,
+                            color=status_color,
+                            weight=ft.FontWeight.W_500,
+                        ),
+                    ],
+                    spacing=5,
+                ),
+            )
         
         return ft.Card(
             content=ft.Container(
@@ -125,30 +149,7 @@ class WeekSelector:
                     [
                         # 左侧：周次信息
                         ft.Column(
-                            [
-                                ft.Text(
-                                    f"Week {week}: {title}",
-                                    size=20,
-                                    weight=ft.FontWeight.BOLD,
-                                ),
-                                ft.Text(
-                                    f"时间: {start_date} ~ {end_date}",
-                                    size=14,
-                                    color=ft.Colors.GREY_700,
-                                ),
-                                ft.Row(
-                                    [
-                                        ft.Icon(status_icon, color=status_color, size=20),
-                                        ft.Text(
-                                            status_text,
-                                            size=14,
-                                            color=status_color,
-                                            weight=ft.FontWeight.W_500,
-                                        ),
-                                    ],
-                                    spacing=5,
-                                ),
-                            ],
+                            left_column_items,
                             spacing=8,
                             expand=True,
                         ),
@@ -247,14 +248,52 @@ class WeekSelector:
         return {"completed": completed, "total": total}
     
     def _on_week_click(self, week: int):
-        """周次点击事件"""
+        """周次点击事件 - 自动跳转到第一个未完成的题目"""
         draw_file = os.path.join(QUESTIONS_DIR, f"week{week}", "draw_result.json")
         
         if not os.path.exists(draw_file):
             self.app.show_snackbar("请先点击'检查更新'下载题目", ft.Colors.ORANGE)
             return
         
-        self.app.show_question_view(week, 0)
+        # 读取抽题结果
+        try:
+            with open(draw_file, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+                drawn_questions = data.get("drawn_questions", [])
+        except Exception:
+            drawn_questions = []
+        
+        # 找到第一个未完成的题目索引
+        start_index = 0
+        for i, q_info in enumerate(drawn_questions):
+            qid = q_info.get('id', '')
+            if not self._is_question_completed(week, qid):
+                start_index = i
+                break
+        
+        self.app.show_question_view(week, start_index)
+    
+    def _is_question_completed(self, week: int, question_id: str) -> bool:
+        """检查指定题目是否已完成"""
+        if not question_id:
+            return False
+        
+        progress_file = os.path.join(
+            SUBMISSIONS_DIR, 
+            f"week{week}", 
+            question_id, 
+            "progress.json"
+        )
+        
+        if os.path.exists(progress_file):
+            try:
+                with open(progress_file, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                    return data.get("status") == "completed"
+            except Exception:
+                pass
+        
+        return False
     
     def _on_check_update(self, e):
         """检查更新按钮点击"""

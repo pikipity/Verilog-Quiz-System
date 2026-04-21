@@ -57,6 +57,9 @@ class QuestionView:
             [
                 self._build_header(),
                 ft.Divider(height=1),
+                # 题目选择块
+                self._build_question_selector(),
+                ft.Divider(height=1),
                 # 题目描述
                 self._build_question_panel(),
                 ft.Divider(height=1),
@@ -118,6 +121,108 @@ class QuestionView:
             padding=ft.padding.symmetric(horizontal=10, vertical=5),
         )
     
+    def _build_question_selector(self) -> ft.Control:
+        """构建题目选择块（快速跳转）"""
+        total = len(self.app.drawn_questions) if self.app.drawn_questions else 0
+        
+        if total == 0:
+            return ft.Container()
+        
+        # 构建题目按钮列表
+        question_buttons = []
+        for i in range(total):
+            q_info = self.app.drawn_questions[i] if i < len(self.app.drawn_questions) else {}
+            q_title = q_info.get('title', f'题{i+1}')
+            is_current = i == self.question_index
+            
+            # 检查题目完成状态
+            is_completed = self._is_question_completed(i, q_info.get('id', ''))
+            
+            # 根据状态设置颜色
+            if is_current:
+                bg_color = ft.Colors.BLUE
+                text_color = ft.Colors.WHITE
+                icon = ft.Icons.EDIT
+            elif is_completed:
+                bg_color = ft.Colors.GREEN_100
+                text_color = ft.Colors.GREEN
+                icon = ft.Icons.CHECK_CIRCLE
+            else:
+                bg_color = ft.Colors.GREY_100
+                text_color = ft.Colors.GREY_700
+                icon = ft.Icons.RADIO_BUTTON_UNCHECKED
+            
+            btn = ft.ElevatedButton(
+                content=ft.Row(
+                    [
+                        ft.Icon(icon, size=16, color=text_color),
+                        ft.Text(
+                            f"{i+1}. {q_title}",
+                            size=12,
+                            color=text_color,
+                            weight=ft.FontWeight.BOLD if is_current else ft.FontWeight.NORMAL,
+                        ),
+                    ],
+                    spacing=4,
+                ),
+                style=ft.ButtonStyle(
+                    bgcolor=bg_color,
+                    padding=ft.padding.symmetric(horizontal=12, vertical=8),
+                ),
+                on_click=lambda e, idx=i: self._on_question_select(idx),
+                disabled=is_current,  # 当前题目禁用点击
+            )
+            question_buttons.append(btn)
+        
+        return ft.Container(
+            content=ft.Column(
+                [
+                    ft.Text("题目选择", size=14, weight=ft.FontWeight.BOLD),
+                    ft.Divider(height=1),
+                    ft.Row(
+                        question_buttons,
+                        spacing=8,
+                        wrap=True,  # 允许换行
+                    ),
+                ],
+                spacing=5,
+            ),
+            padding=10,
+            border=ft.border.all(1, ft.Colors.BLUE_200),
+            border_radius=8,
+            bgcolor=ft.Colors.BLUE_50,
+        )
+    
+    def _is_question_completed(self, index: int, question_id: str) -> bool:
+        """检查指定题目是否已完成"""
+        if not question_id:
+            return False
+        
+        progress_file = os.path.join(
+            SUBMISSIONS_DIR, 
+            f"week{self.week}", 
+            question_id, 
+            "progress.json"
+        )
+        
+        if os.path.exists(progress_file):
+            try:
+                with open(progress_file, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                    return data.get("status") == "completed"
+            except Exception:
+                pass
+        
+        return False
+    
+    def _on_question_select(self, index: int):
+        """题目选择按钮点击"""
+        if index != self.question_index:
+            # 先保存当前代码
+            self._save_code()
+            # 跳转到选择的题目
+            self.app.navigate_to_question(index)
+    
     def _build_question_panel(self) -> ft.Control:
         """构建题目显示面板"""
         question_md = self._load_question_markdown()
@@ -142,7 +247,7 @@ class QuestionView:
         )
     
     def _build_editor_panel(self, existing_code: str) -> ft.Control:
-        """构建代码编辑面板"""
+        """构建代码编辑面板（带行号）"""
         self.current_code = existing_code
         
         # 自动保存函数（当焦点移出时）
@@ -151,6 +256,29 @@ class QuestionView:
             if self._save_code():
                 print(f"自动保存: {self.question_id}.v")
         
+        # 计算行号
+        line_count = existing_code.count('\n') + 1 if existing_code else 1
+        line_numbers_text = '\n'.join(str(i) for i in range(1, line_count + 1))
+        
+        # 行号显示组件（只读）
+        self.editor_line_numbers = ft.TextField(
+            value=line_numbers_text,
+            multiline=True,
+            min_lines=15,
+            max_lines=None,
+            text_style=ft.TextStyle(
+                font_family=CODE_FONT,
+                size=CODE_FONT_SIZE,
+                color=ft.Colors.GREY_500,
+            ),
+            border_color=ft.Colors.TRANSPARENT,
+            read_only=True,
+            bgcolor=ft.Colors.GREY_100,
+            width=50,
+            content_padding=ft.padding.only(left=8, right=4, top=12, bottom=12),
+        )
+        
+        # 代码编辑器
         self.code_editor = ft.TextField(
             value=existing_code,
             multiline=True,
@@ -162,9 +290,10 @@ class QuestionView:
             ),
             border_color=ft.Colors.BLUE_400,
             hint_text="在此编写Verilog代码...",
-            on_change=self._on_code_change,
+            on_change=self._on_code_change_with_line_numbers,
             on_blur=on_blur_save,  # 焦点移出时自动保存
-            expand=True,  # 让TextField填充宽度
+            expand=True,
+            content_padding=ft.padding.only(left=8, top=12, bottom=12),
         )
         
         return ft.Container(
@@ -172,7 +301,15 @@ class QuestionView:
                 [
                     ft.Text("代码编辑器", size=16, weight=ft.FontWeight.BOLD),
                     ft.Divider(height=1),
-                    self.code_editor,
+                    ft.Row(
+                        [
+                            self.editor_line_numbers,
+                            ft.VerticalDivider(width=1, color=ft.Colors.GREY_300),
+                            self.code_editor,
+                        ],
+                        spacing=0,
+                        expand=True,
+                    ),
                 ],
                 spacing=5,
             ),
@@ -182,25 +319,59 @@ class QuestionView:
         )
     
     def _build_testbench_panel(self, testbench_code: str) -> ft.Control:
-        """构建testbench显示面板（只读）"""
+        """构建testbench显示面板（只读，带行号）"""
+        # 计算行号
+        line_count = testbench_code.count('\n') + 1 if testbench_code else 1
+        line_numbers_text = '\n'.join(str(i) for i in range(1, line_count + 1))
+        
+        # 行号显示
+        tb_line_numbers = ft.TextField(
+            value=line_numbers_text,
+            multiline=True,
+            min_lines=10,
+            max_lines=None,
+            text_style=ft.TextStyle(
+                font_family=CODE_FONT,
+                size=CODE_FONT_SIZE,
+                color=ft.Colors.GREY_500,
+            ),
+            border_color=ft.Colors.TRANSPARENT,
+            read_only=True,
+            bgcolor=ft.Colors.GREY_100,
+            width=50,
+            content_padding=ft.padding.only(left=8, right=4, top=12, bottom=12),
+        )
+        
+        # testbench代码显示
+        tb_code = ft.TextField(
+            value=testbench_code,
+            multiline=True,
+            min_lines=10,
+            max_lines=None,
+            text_style=ft.TextStyle(
+                font_family=CODE_FONT,
+                size=CODE_FONT_SIZE,
+            ),
+            border_color=ft.Colors.GREY_400,
+            read_only=True,
+            bgcolor=ft.Colors.GREY_50,
+            expand=True,
+            content_padding=ft.padding.only(left=8, top=12, bottom=12),
+        )
+        
         return ft.Container(
             content=ft.Column(
                 [
                     ft.Text("测试平台 (Testbench)", size=16, weight=ft.FontWeight.BOLD),
                     ft.Divider(height=1),
-                    ft.TextField(
-                        value=testbench_code,
-                        multiline=True,
-                        min_lines=10,
-                        max_lines=None,
-                        text_style=ft.TextStyle(
-                            font_family=CODE_FONT,
-                            size=CODE_FONT_SIZE,
-                        ),
-                        border_color=ft.Colors.GREY_400,
-                        read_only=True,
-                        bgcolor=ft.Colors.GREY_50,
-                        expand=True,  # 让TextField填充宽度
+                    ft.Row(
+                        [
+                            tb_line_numbers,
+                            ft.VerticalDivider(width=1, color=ft.Colors.GREY_300),
+                            tb_code,
+                        ],
+                        spacing=0,
+                        expand=True,
                     ),
                 ],
                 spacing=5,
@@ -359,6 +530,20 @@ endmodule
         """代码改变事件"""
         self._update_code_status(e.control.value)
     
+    def _on_code_change_with_line_numbers(self, e):
+        """代码改变事件（同步更新行号）"""
+        value = e.control.value
+        self._update_code_status(value)
+        self._update_editor_line_numbers(value)
+    
+    def _update_editor_line_numbers(self, code: str):
+        """更新代码编辑器行号"""
+        if hasattr(self, 'editor_line_numbers'):
+            line_count = code.count('\n') + 1 if code else 1
+            line_numbers_text = '\n'.join(str(i) for i in range(1, line_count + 1))
+            self.editor_line_numbers.value = line_numbers_text
+            self.editor_line_numbers.update()
+    
     def _update_code_status(self, value: str):
         """更新代码状态"""
         self.current_code = value
@@ -398,7 +583,7 @@ endmodule
             self.status_text.update()
             return False
     
-    def _update_progress(self):
+    def _update_progress(self, status: str = "in_progress"):
         """更新进度文件（使用ID记录，保存在题目子文件夹中）"""
         question_dir = os.path.join(SUBMISSIONS_DIR, f"week{self.week}", self.question_id)
         os.makedirs(question_dir, exist_ok=True)
@@ -420,7 +605,7 @@ endmodule
             "question_id": self.question_id,
             "index": self.question_index,
             "title": self.question_info.get('title', '') if self.question_info else '',
-            "status": "in_progress",
+            "status": status,
             "last_save": datetime.now().isoformat(),
         })
         
@@ -429,6 +614,42 @@ endmodule
                 json.dump(progress_data, f, ensure_ascii=False, indent=2)
         except Exception as e:
             print(f"更新进度失败: {e}")
+        
+        # 同时更新周总体进度文件
+        self._update_week_progress(status)
+    
+    def _update_week_progress(self, status: str = "in_progress"):
+        """更新周总体进度文件（供week_selector读取）"""
+        week_dir = os.path.join(SUBMISSIONS_DIR, f"week{self.week}")
+        os.makedirs(week_dir, exist_ok=True)
+        
+        week_progress_file = os.path.join(week_dir, "progress.json")
+        
+        week_data = {"questions": {}}
+        
+        # 读取现有周进度
+        if os.path.exists(week_progress_file):
+            try:
+                with open(week_progress_file, 'r', encoding='utf-8') as f:
+                    week_data = json.load(f)
+                    if "questions" not in week_data:
+                        week_data["questions"] = {}
+            except Exception:
+                pass
+        
+        # 更新当前题目状态
+        week_data["questions"][self.question_id] = {
+            "status": status,
+            "index": self.question_index,
+            "title": self.question_info.get('title', '') if self.question_info else '',
+            "last_update": datetime.now().isoformat(),
+        }
+        
+        try:
+            with open(week_progress_file, 'w', encoding='utf-8') as f:
+                json.dump(week_data, f, ensure_ascii=False, indent=2)
+        except Exception as e:
+            print(f"更新周进度失败: {e}")
     
     def _on_run_test(self, e):
         """运行测试按钮点击"""
@@ -1036,6 +1257,9 @@ endmodule
     def _on_save_and_continue(self, e):
         """保存并继续按钮点击"""
         if self._save_code():
+            # 标记当前题目为已完成
+            self._update_progress(status="completed")
+            
             total = len(self.app.drawn_questions)
             
             if self.question_index + 1 < total:
@@ -1119,7 +1343,7 @@ endmodule
         self.app.page.update()
     
     def _show_open_report_dialog(self, report_path: str):
-        """显示打开报告对话框"""
+        """显示打开报告对话框，关闭后返回题目选择界面"""
         import subprocess
         
         def open_folder(e):
@@ -1127,10 +1351,14 @@ endmodule
             subprocess.run(['explorer', folder])
             dialog.open = False
             self.app.page.update()
+            # 返回题目选择界面
+            self.app.show_week_selector()
         
         def close(e):
             dialog.open = False
             self.app.page.update()
+            # 返回题目选择界面
+            self.app.show_week_selector()
         
         dialog = ft.AlertDialog(
             title=ft.Text("报告已生成"),
