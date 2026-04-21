@@ -1,0 +1,399 @@
+# Verilog 作业考试系统使用手册
+
+# Verilog Quiz System User Manual
+
+---
+
+- [简介 / Introduction](#简介--introduction)
+- [支持的平台 / Supported Platforms](#支持的平台--supported-platforms)
+- [准备工作 / Prerequisites](#准备工作--prerequisites)
+- [下载与运行 / Download and Run](#下载与运行--download-and-run)
+- [使用教程 / Usage Tutorial](#使用教程--usage-tutorial)
+- [故障排除 / Troubleshooting](#故障排除--troubleshooting)
+- [附录：Linux 基础 / Appendix: Linux Basics](#附录linux-基础--appendix-linux-basics)
+
+---
+
+## 简介 / Introduction
+
+本手册面向 EIE330 课程学生，详细介绍如何安装和使用 Verilog 作业考试系统完成课程作业。
+
+This manual is designed for EIE330 course students, providing detailed instructions on how to install and use the Verilog Quiz System to complete course assignments.
+
+---
+
+## 支持的平台 / Supported Platforms
+
+| 平台 / Platform | 支持状态 / Status | 推荐度 / Recommendation |
+|---|---|---|
+| Windows 10/11 | ✅ 完全支持 / Fully supported | ⭐⭐⭐ |
+| Ubuntu 22.04 LTS | ✅ 完全支持 / Fully supported | ⭐⭐⭐⭐⭐ |
+| macOS 15.0+ | ✅ 支持 / Supported | ⭐⭐⭐ |
+
+**特别提醒 Linux 用户 / Special Note for Linux Users：**
+
+本课程强烈推荐使用 **Ubuntu 22.04 LTS** 作为开发环境。即使你是 Linux 初学者，也不用担心！本手册会详细介绍所有必要的 Linux 基础操作。
+
+We strongly recommend using **Ubuntu 22.04 LTS** as the development environment for this course. Don't worry if you're new to Linux! This manual will detail all necessary basic Linux operations.
+
+---
+
+## 准备工作 / Prerequisites
+
+### 需要预装的软件 / Required Software
+
+在使用本程序之前，你需要安装以下软件：
+
+Before using this application, you need to install the following software:
+
+| 软件 / Software | 用途 / Purpose | 安装说明 / Installation |
+|---|---|---|
+| **Icarus Verilog** | Verilog 仿真器 / Simulator | 见下方详细说明 / See detailed instructions below |
+
+### 安装 Icarus Verilog / Installing Icarus Verilog
+
+#### Windows（使用 WSL）/ Windows (Using WSL)
+
+Windows 用户需要安装 **WSL + Ubuntu 22.04**，然后在 WSL 中安装 iverilog：
+
+```powershell
+# 1. 以管理员身份打开 PowerShell，安装 WSL / Open PowerShell as admin, install WSL
+wsl --install -d Ubuntu-22.04
+
+# 2. 重启电脑 / Restart computer
+
+# 3. 在 WSL 中安装 iverilog / Install iverilog in WSL
+wsl sudo apt-get update
+wsl sudo apt-get install -y iverilog
+```
+
+#### macOS / macOS
+
+使用 Homebrew 安装 / Install with Homebrew：
+
+```bash
+# 1. 安装 Homebrew（如果未安装）/ Install Homebrew (if not installed)
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+
+# 2. 安装 iverilog / Install iverilog
+brew install icarus-verilog
+```
+
+#### Linux（Ubuntu 22.04+）/ Linux (Ubuntu 22.04+)
+
+```bash
+# 安装 iverilog / Install iverilog
+sudo apt-get update
+sudo apt-get install -y iverilog
+```
+
+**验证安装 / Verify installation：**
+```bash
+iverilog -v
+# 预期输出 / Expected: Icarus Verilog version 12.0 (stable)
+```
+
+---
+
+## 下载与运行 / Download and Run
+
+### 从 GitHub 下载可执行文件 / Download Executable from GitHub
+
+1. **访问 Releases 页面** / **Visit Releases page**
+   - 打开：https://github.com/pikipity/Verilog-Quiz-System/releases
+   - 找到最新版本（Latest）
+
+2. **下载对应版本** / **Download for your platform**
+   | 平台 / Platform | 下载文件 / Download File |
+   |---|---|
+   | Windows | `verilog-quiz-windows.exe` |
+   | Linux (Ubuntu) | `verilog-quiz-linux` |
+   | macOS | `verilog-quiz-macos` |
+
+3. **运行程序** / **Run the application**
+
+   **Windows：**
+   - 双击 `verilog-quiz-windows.exe` 运行
+
+   **Linux/macOS：**
+   ```bash
+   # 1. 打开终端，进入下载目录 / Open terminal, navigate to download directory
+   cd ~/Downloads
+   
+   # 2. 赋予执行权限 / Add execute permission
+   chmod +x verilog-quiz-linux
+   
+   # 3. 运行 / Run
+   ./verilog-quiz-linux
+   ```
+
+---
+
+## 使用教程 / Usage Tutorial
+
+### 首次使用 / First Time Use
+
+1. **启动程序** / **Launch the application**
+   - 运行可执行文件，进入周次选择界面
+   - Run the executable to enter the week selection interface
+
+2. **检查更新** / **Check for updates**
+   - 点击 **"检查更新"** 按钮从服务器下载题目
+   - Click **"Check Update"** button to download questions from server
+   - 如果提示连接失败，请检查网络或联系助教
+   - If connection fails, check network or contact TA
+
+3. **选择周次** / **Select week**
+   - 下载完成后，会显示可用的周次列表
+   - Available weeks will be displayed after download
+   - 点击 **"开始"** 进入答题界面
+   - Click **"Start"** to enter the question interface
+
+### 答题流程 / Answering Process
+
+1. **题目选择** / **Question Selection**
+   - 界面顶部显示所有题目，可快速跳转
+   - All questions displayed at top for quick navigation
+   - 当前题目高亮显示，已完成的题目显示勾选标记
+   - Current question highlighted, completed questions show checkmark
+
+2. **查看题目** / **View Question**
+   - 阅读题目描述，了解功能要求和端口定义
+   - Read question description, understand requirements and port definitions
+   - 查看端口定义表格，明确输入输出信号
+   - Check port definition table for input/output signals
+
+3. **编写代码** / **Write Code**
+   - 在代码编辑器中编写 Verilog 代码
+   - Write Verilog code in the code editor
+   - 代码会自动保存（每30秒/失焦时/运行前）
+   - Code auto-saves every 30 seconds, on focus out, and before run
+   - 行号已显示，方便定位
+   - Line numbers displayed for easy reference
+
+4. **查看测试平台** / **View Testbench**
+   - 查看 Testbench 代码，了解测试用例
+   - Check Testbench code to understand test cases
+   - 了解输入信号的时序变化
+   - Understand timing changes of input signals
+
+5. **运行测试** / **Run Test**
+   - 点击 **"运行测试"** 按钮
+   - Click **"Run Test"** button
+   - 程序会自动编译你的代码并运行仿真
+   - Application automatically compiles your code and runs simulation
+   - 显示波形图对比期望输出和实际输出
+   - Displays waveform comparing expected vs actual output
+
+6. **查看结果** / **Check Results**
+   - 波形图中：
+   - In waveform display:
+     - **黑色**：输入信号 / **Black**: Input signals
+     - **蓝色**：期望输出 / **Blue**: Expected output
+     - **绿色**：实际输出 / **Green**: Actual output
+   - 如果波形不匹配，返回修改代码
+   - If waveforms don't match, return to modify code
+
+7. **保存继续** / **Save and Continue**
+   - 测试通过后，点击 **"保存并继续"**
+   - After test passes, click **"Save and Continue"**
+   - 进入下一题，或完成本周作业
+   - Proceed to next question or complete weekly assignment
+
+### 生成报告 / Generate Report
+
+完成所有题目后：
+
+After completing all questions:
+
+1. 程序会提示 **"本周作业已完成！请生成报告。"**
+   - Application prompts **"Weekly assignment completed! Please generate report."**
+
+2. 点击 **"生成报告"** 按钮
+   - Click **"Generate Report"** button
+
+3. 报告将保存到系统应用数据目录：
+   - Report saved to system application data directory:
+   - Windows: `C:\Users\<用户名>\AppData\Local\Verilog-Quiz\reports\`
+   - Linux: `~/.local/share/verilog-quiz/reports/`
+   - macOS: `~/Library/Application Support/Verilog-Quiz/reports/`
+
+4. 点击 **"打开文件夹"** 查看报告
+   - Click **"Open Folder"** to view report
+
+5. 手动将报告文件提交到学校作业系统
+   - Manually submit the report file to school assignment system
+
+### 查看数据目录 / View Data Directory
+
+如需查看或备份你的代码和进度：
+
+To view or backup your code and progress:
+
+1. 在周次选择界面点击 **"打开数据目录"**
+   - Click **"Open Data Directory"** in week selection interface
+
+2. 系统文件管理器会打开数据文件夹
+   - System file manager opens the data folder
+
+3. 目录结构：
+   - Directory structure:
+   ```
+   Verilog-Quiz/
+   ├── questions/      # 下载的题目 / Downloaded questions
+   ├── submissions/    # 你的代码和进度 / Your code and progress
+   └── reports/        # 生成的报告 / Generated reports
+   ```
+
+---
+
+## 故障排除 / Troubleshooting
+
+### Q1: 提示"未检测到 iverilog"
+
+**A:**
+1. 确认 iverilog 已正确安装：`iverilog -v`
+2. 确认 iverilog 在系统 PATH 中
+3. **Windows**: 尝试使用 WSL 模式（程序会自动检测）
+4. **Linux**: 确认安装命令执行成功，尝试重新安装
+
+### Q2: 无法连接到服务器
+
+**A:**
+1. 检查网络连接是否正常
+2. 尝试在浏览器中访问服务器地址，确认服务器可用
+3. 联系助教确认服务器状态
+
+### Q3: Linux 提示权限不足
+
+**A:**
+```bash
+# 赋予执行权限
+chmod +x verilog-quiz-linux
+
+# 或者以管理员权限运行（不推荐）
+sudo ./verilog-quiz-linux
+```
+
+### Q4: 编译失败，提示语法错误
+
+**A:**
+1. 仔细检查 Verilog 代码语法
+2. 确保所有模块名、端口名拼写正确
+3. 检查是否缺少分号 `;` 或括号不匹配
+4. 参考 Testbench 中的端口定义
+
+### Q5: 波形图不显示或显示异常
+
+**A:**
+1. 确认代码编译成功（无红色错误提示）
+2. 检查 Testbench 中的 `$display` 输出格式
+3. 确认模块端口连接正确
+4. 重新运行测试
+
+### Q6: 报告生成失败
+
+**A:**
+1. 确认已完成所有题目（显示"已完成"状态）
+2. 检查磁盘空间是否充足
+3. 尝试手动创建 reports 目录
+4. 查看程序是否有写入权限
+
+---
+
+## 获取帮助 / Getting Help
+
+如果在使用过程中遇到任何问题，请：
+
+If you encounter any issues during use, please:
+
+1. 仔细阅读本手册相关章节 / Carefully check relevant sections of this manual
+2. 查看程序界面的错误提示信息 / Check error messages in application interface
+3. 检查终端/命令行的错误输出 / Check terminal/command line error output
+4. 向课程助教或老师寻求帮助 / Seek help from course TAs or instructors
+
+---
+
+祝学习顺利！/ Happy learning!
+
+---
+
+## 附录：Linux 基础 / Appendix: Linux Basics
+
+⚠️ **重要提示 / Important:** 即使你从未使用过 Linux，也不用担心！以下基础命令足以完成本课程的所有操作。
+
+Don't worry if you've never used Linux before! The following basic commands are sufficient for all operations in this course.
+
+### 什么是终端？/ What is a Terminal?
+
+终端（Terminal）是一个可以通过输入命令来控制电脑的程序。在 Windows 上你可能习惯使用图形界面点击操作，而在 Linux 中，很多操作通过输入命令更加高效。
+
+A terminal is a program that allows you to control your computer by typing commands. While you may be used to clicking through graphical interfaces on Windows, many operations are more efficient through command input in Linux.
+
+### 打开终端 / Opening a Terminal
+
+Ubuntu 中打开终端的三种方法 / Three ways to open a terminal in Ubuntu:
+
+- **快捷键 / Keyboard Shortcut:** 按 `Ctrl` + `Alt` + `T`
+- **应用程序菜单 / Applications Menu:** 点击左下角的"Show Applications"（九宫格图标），搜索 "terminal"
+- **右键菜单 / Right-click Menu:** 在桌面或文件夹空白处右键 → "Open in Terminal"
+
+打开终端后，你会看到一个提示符（prompt），通常长这样：
+
+After opening the terminal, you will see a prompt that typically looks like this:
+
+```
+username@computer-name:~$
+```
+
+- `username`: 你的用户名 / Your username
+- `computer-name`: 计算机名称 / Computer name
+- `~`: 当前所在目录（`~` 表示用户主目录 / home directory）
+- `$`: 表示普通用户权限 / Indicates normal user privileges
+
+### 必备命令 / Essential Commands
+
+| 命令 / Command | 全称 / Full Name | 功能 / Function | 示例 / Example |
+|---|---|---|---|
+| `pwd` | Print Working Directory | 显示当前所在路径 / Show current path | `pwd` |
+| `ls` | List | 列出当前目录的文件 / List files | `ls`, `ls -la` |
+| `cd` | Change Directory | 切换目录 / Change directory | `cd Documents`, `cd ..` |
+| `mkdir` | Make Directory | 创建新文件夹 / Create new folder | `mkdir my_project` |
+| `cp` | Copy | 复制文件 / Copy file | `cp file.txt backup.txt` |
+| `mv` | Move | 移动或重命名 / Move or rename | `mv old.txt new.txt` |
+| `rm` | Remove | 删除文件 / Delete file | `rm file.txt` |
+| `chmod` | Change Mode | 修改文件权限 / Change permissions | `chmod +x script.sh` |
+| `sudo` | Superuser Do | 以管理员权限执行 / Execute as admin | `sudo apt update` |
+
+### 命令详解 / Detailed Command Usage
+
+```bash
+# 1. pwd - 查看我在哪里 / See where you are
+$ pwd
+/home/username/Documents
+
+# 2. ls - 查看周围有什么 / See what's around
+$ ls                    # 简单列表 / Simple list
+$ ls -l                 # 详细列表 / Detailed list
+$ ls -la                # 详细+隐藏文件 / Detailed + hidden
+
+# 3. cd - 移动到另一个文件夹 / Move to another folder
+$ cd Documents          # 进入 Documents / Enter Documents
+$ cd ..                 # 返回上一级 / Go to parent
+$ cd ~                  # 返回主目录 / Go to home
+
+# 4. mkdir - 创建文件夹 / Create folder
+$ mkdir MyProject       # 创建 MyProject 文件夹
+
+# 5. cp - 复制 / Copy
+$ cp file.txt backup.txt    # 复制文件
+$ cp -r folder1 folder2     # 复制整个文件夹
+
+# 6. mv - 移动或重命名 / Move or rename
+$ mv old.txt new.txt    # 重命名 / Rename
+
+# 7. chmod - 修改权限 / Change permissions
+$ chmod +x program      # 添加执行权限 / Add execute permission
+```
+
+💡 **提示 / Tip:** 使用 `Tab` 键可以自动补全文件名，避免输入错误！
