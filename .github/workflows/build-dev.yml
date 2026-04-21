@@ -1,0 +1,65 @@
+name: Build Dev
+
+# 触发条件：除 main 分支外的其他分支 push
+on:
+  push:
+    branches-ignore:
+      - main
+
+  # 允许手动触发
+  workflow_dispatch:
+
+# 使用 Node.js 24（消除 deprecation 警告）
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  build:
+    name: Build ${{ matrix.target }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            target: windows
+          - os: ubuntu-22.04
+            target: linux
+          - os: macos-latest
+            target: macos
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pyinstaller flet cryptography requests
+
+      - name: Install flet-desktop
+        run: pip install flet-desktop
+
+      - name: Build executable
+        run: >
+          pyinstaller --onefile --name verilog-quiz-${{ matrix.target }}-dev --clean
+          --windowed --noconsole
+          --hidden-import=flet_desktop
+          --hidden-import=flet.utils.pip
+          --collect-all flet
+          --collect-all flet_desktop
+          main.py
+
+      # 开发版本只上传 artifact，不创建 Release
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: verilog-quiz-${{ matrix.target }}-dev
+          path: dist/*
+          retention-days: 7
