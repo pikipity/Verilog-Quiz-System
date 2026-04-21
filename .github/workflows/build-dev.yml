@@ -22,7 +22,7 @@ jobs:
         include:
           - os: windows-latest
             target: windows
-          - os: ubuntu-20.04
+          - os: ubuntu-22.04
             target: linux
           - os: macos-latest
             target: macos
@@ -49,6 +49,7 @@ jobs:
       - name: Build executable
         run: >
           pyinstaller --onefile --name verilog-quiz-${{ matrix.target }}-dev --clean
+          --windowed --noconsole
           --hidden-import=flet_desktop
           --hidden-import=flet.utils.pip
           --collect-all flet
