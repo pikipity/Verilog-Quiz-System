@@ -2,11 +2,13 @@
 周次选择界面
 """
 import os
+import sys
+import subprocess
 import json
 import threading
 from datetime import datetime
 import flet as ft
-from config import QUESTIONS_DIR, SUBMISSIONS_DIR, SERVER_URL
+from config import QUESTIONS_DIR, SUBMISSIONS_DIR, SERVER_URL, BASE_DIR
 
 
 class WeekSelector:
@@ -180,10 +182,24 @@ class WeekSelector:
             on_click=self._on_check_update,
         )
         
+        # 打开数据目录按钮
+        open_data_btn = ft.TextButton(
+            "打开数据目录",
+            icon=ft.Icons.FOLDER_OPEN,
+            on_click=self._on_open_data_directory,
+            tooltip=f"数据存储位置: {BASE_DIR}",
+        )
+        
         return ft.Container(
             content=ft.Row(
                 [
-                    self.check_update_btn,
+                    ft.Row(
+                        [
+                            self.check_update_btn,
+                            open_data_btn,
+                        ],
+                        spacing=10,
+                    ),
                     ft.Text(
                         f"服务器: {SERVER_URL}",
                         size=12,
@@ -294,6 +310,20 @@ class WeekSelector:
                 pass
         
         return False
+    
+    def _on_open_data_directory(self, e):
+        """打开数据目录"""
+        try:
+            if sys.platform == 'win32':
+                subprocess.run(['explorer', BASE_DIR])
+            elif sys.platform == 'darwin':
+                subprocess.run(['open', BASE_DIR])
+            else:
+                subprocess.run(['xdg-open', BASE_DIR])
+            
+            self.app.show_snackbar(f"已打开: {BASE_DIR}", ft.Colors.GREEN)
+        except Exception as ex:
+            self.app.show_snackbar(f"无法打开目录: {ex}", ft.Colors.RED)
     
     def _on_check_update(self, e):
         """检查更新按钮点击"""
