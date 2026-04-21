@@ -1345,10 +1345,21 @@ endmodule
     def _show_open_report_dialog(self, report_path: str):
         """显示打开报告对话框，关闭后返回题目选择界面"""
         import subprocess
+        import sys
         
         def open_folder(e):
             folder = os.path.dirname(report_path)
-            subprocess.run(['explorer', folder])
+            try:
+                # 根据平台选择打开方式
+                if sys.platform == 'win32':
+                    subprocess.run(['explorer', folder])
+                elif sys.platform == 'darwin':
+                    subprocess.run(['open', folder])
+                else:
+                    subprocess.run(['xdg-open', folder])
+            except Exception as ex:
+                self.app.show_snackbar(f"无法打开文件夹: {ex}", ft.Colors.RED)
+            
             dialog.open = False
             self.app.page.update()
             # 返回题目选择界面
