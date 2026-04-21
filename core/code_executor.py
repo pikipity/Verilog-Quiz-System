@@ -12,7 +12,7 @@ from dataclasses import dataclass
 
 @dataclass
 class ExecutionResult:
-    """执行结果"""
+    """Execution result"""
     success: bool
     output: str
     error: str
@@ -23,11 +23,11 @@ class ExecutionResult:
 
 class CodeExecutor:
     """
-    代码执行器
+    Code Executor
     
-    支持跨平台调用iverilog：
-    - Linux/Mac: 直接调用iverilog
-    - Windows: 先尝试直接调用，失败则尝试WSL
+    Support cross-platform iverilog calls:
+    - Linux/Mac: Call iverilog directly
+    - Windows: Try direct call first, then try WSL
     """
     
     def __init__(self):
@@ -36,44 +36,44 @@ class CodeExecutor:
         self._detect_iverilog()
     
     def _detect_iverilog(self):
-        """检测iverilog环境"""
+        """Detect iverilog environment"""
         if self.system in ['Linux', 'Darwin']:
-            # Linux/Mac直接检测
+            # Linux/Mac direct detection
             try:
                 subprocess.run(['iverilog', '-V'], capture_output=True, check=True)
-                print("检测到iverilog (Linux/Mac)")
+                print("Detected iverilog (Linux/Mac)")
             except (subprocess.CalledProcessError, FileNotFoundError):
-                print("警告: 未检测到iverilog，请安装")
+                print("Warning: iverilog not detected, please install")
         else:
             # Windows: 先尝试直接调用
             try:
                 subprocess.run(['iverilog', '-V'], capture_output=True, check=True)
-                print("检测到iverilog (Windows)")
+                print("Detected iverilog (Windows)")
             except (subprocess.CalledProcessError, FileNotFoundError):
                 # 尝试WSL
                 try:
                     subprocess.run(['wsl', 'iverilog', '-V'], capture_output=True, check=True)
                     self.use_wsl = True
-                    print("检测到iverilog (WSL)")
+                    print("Detected iverilog (WSL)")
                 except (subprocess.CalledProcessError, FileNotFoundError):
-                    print("警告: 未检测到iverilog (Windows/WSL)")
+                    print("Warning: iverilog not detected (Windows/WSL)")
     
     def _run_command(self, cmd: List[str], cwd: str = None, timeout: int = 30) -> Tuple[bool, str, str]:
         """
-        运行命令
+        Run command
         
         Args:
-            cmd: 命令列表
-            cwd: 工作目录
-            timeout: 超时时间（秒）
+            cmd: Command list
+            cwd: Working directory
+            timeout: Timeout (seconds)
             
         Returns:
-            (是否成功, stdout, stderr)
+            (success, stdout, stderr)
         """
         try:
             if self.use_wsl:
-                # 转换命令中的文件路径为WSL路径
-                # 注意：cwd保持Windows路径，因为subprocess.run需要Windows路径
+                # Convert file paths in command to WSL paths
+                # Note: cwd keeps Windows path because subprocess.run needs Windows path
                 cmd = [self._to_wsl_path(arg) if os.path.exists(arg) or ('/' in arg and ':' not in arg) else arg 
                        for arg in cmd]
                 cmd = ['wsl'] + cmd
@@ -98,33 +98,33 @@ class CodeExecutor:
     
     def _to_wsl_path(self, path: str) -> str:
         """
-        将Windows路径转换为WSL路径
+        Convert Windows path to WSL path
         
-        例如: C:/Users/name/file -> /mnt/c/Users/name/file
+        Example: C:/Users/name/file -> /mnt/c/Users/name/file
         """
         if not path or path.startswith('/'):
             return path
         
-        # 处理Windows绝对路径
+        # Handle Windows absolute path
         if len(path) >= 2 and path[1] == ':':
             drive = path[0].lower()
             rest = path[2:].replace('\\', '/')
             return f"/mnt/{drive}{rest}"
         
-        # 相对路径
+        # Relative path
         return path.replace('\\', '/')
     
     def compile(self, verilog_files: List[str], output_file: str, work_dir: str) -> Tuple[bool, str]:
         """
-        编译Verilog文件
+        Compile Verilog files
         
         Args:
-            verilog_files: Verilog源文件列表
-            output_file: 输出文件名
-            work_dir: 工作目录
+            verilog_files: List of Verilog source files
+            output_file: Output filename
+            work_dir: Working directory
             
         Returns:
-            (是否成功, 错误信息)
+            (success, error_message)
         """
         cmd = ['iverilog', '-o', output_file] + verilog_files
         success, stdout, stderr = self._run_command(cmd, cwd=work_dir)
@@ -136,14 +136,14 @@ class CodeExecutor:
     
     def run_simulation(self, vvp_file: str, work_dir: str) -> Tuple[bool, str, str]:
         """
-        运行仿真
+        Run simulation
         
         Args:
-            vvp_file: vvp文件路径
-            work_dir: 工作目录
+            vvp_file: vvp file path
+            work_dir: Working directory
             
         Returns:
-            (是否成功, 输出内容, 错误信息)
+            (success, output_content, error_message)
         """
         cmd = ['vvp', vvp_file]
         success, stdout, stderr = self._run_command(cmd, cwd=work_dir)
@@ -152,37 +152,37 @@ class CodeExecutor:
     
     def execute(self, verilog_files: List[str], work_dir: str, vvp_name: str = "out.vvp") -> ExecutionResult:
         """
-        完整执行流程：编译+运行
+        Complete execution flow: compile + run
         
         Args:
-            verilog_files: Verilog源文件列表（testbench应在最后）
-            work_dir: 工作目录
-            vvp_name: 生成的vvp文件名
+            verilog_files: List of Verilog source files (testbench should be last)
+            work_dir: Working directory
+            vvp_name: Generated vvp filename
             
         Returns:
             ExecutionResult
         """
         vvp_path = os.path.join(work_dir, vvp_name)
         
-        # 步骤1：编译
+        # Step 1: Compile
         compile_success, compile_error = self.compile(verilog_files, vvp_name, work_dir)
         
         if not compile_success:
             return ExecutionResult(
                 success=False,
                 output="",
-                error=f"编译失败:\n{compile_error}",
+                error=f"Compilation failed:\n{compile_error}",
                 compile_success=False,
                 run_success=False
             )
         
-        # 步骤2：运行
+        # Step 2: Run
         run_success, run_output, run_error = self.run_simulation(vvp_name, work_dir)
         
-        # 查找VCD文件
+        # Find VCD file
         vcd_file = None
         if run_success:
-            # 从输出中提取VCD文件名
+            # Extract VCD filename from output
             vcd_match = re.search(r'\$dumpfile\("(.+?)"\)', ''.join(open(f).read() for f in verilog_files if os.path.exists(f)))
             if vcd_match:
                 vcd_name = vcd_match.group(1)
@@ -190,12 +190,12 @@ class CodeExecutor:
                 if os.path.exists(vcd_path):
                     vcd_file = vcd_path
         
-        # 合并错误信息
+        # Combine error messages
         full_error = ""
         if run_error:
             full_error += run_error + "\n"
         if not run_success and not run_error:
-            full_error = "仿真运行失败"
+            full_error = "Simulation execution failed"
         
         return ExecutionResult(
             success=compile_success and run_success,
@@ -208,19 +208,19 @@ class CodeExecutor:
     
     def extract_display_values(self, output: str) -> List[Dict]:
         """
-        从$display输出中提取数值
+        Extract values from $display output
         
-        期望格式: "time=10 a=1 b=0 sel=0 out=1"
+        Expected format: "time=10 a=1 b=0 sel=0 out=1"
         
         Args:
-            output: 仿真输出
+            output: Simulation output
             
         Returns:
-            数值列表，每项是字典
+            List of values, each is a dict
         """
         values = []
         
-        # 匹配键值对格式
+        # Match key-value pair format
         pattern = r'time=(\d+)\s+(.+)'
         
         for line in output.split('\n'):
@@ -230,7 +230,7 @@ class CodeExecutor:
                 time_val = int(match.group(1))
                 rest = match.group(2)
                 
-                # 解析其余键值对
+                # Parse remaining key-value pairs
                 entry = {'time': time_val}
                 kv_pattern = r'(\w+)=([\w\'b\d]+)'
                 for kv_match in re.finditer(kv_pattern, rest):

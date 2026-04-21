@@ -12,10 +12,10 @@ from config import QUESTIONS_DIR, SUBMISSIONS_DIR, REPORTS_DIR
 
 class ReportGenerator:
     """
-    报告生成器
+    Report Generator
     
-    整合学生代码、测试结果生成Markdown报告
-    使用ID系统查找题目和结果
+    Integrate student code and test results to generate Markdown reports
+    Use ID system to find questions and results
     """
     
     def __init__(self):
@@ -23,18 +23,18 @@ class ReportGenerator:
     
     def generate_week_report(self, week: int) -> Optional[str]:
         """
-        生成周次报告
+        Generate week report
         
         Args:
-            week: 周次
+            week: Week number
             
         Returns:
-            生成的报告文件路径，失败返回None
+            Generated report file path, None if failed
         """
-        # 读取抽题结果（新格式）
+        # Read draw result (new format)
         draw_file = os.path.join(QUESTIONS_DIR, f"week{week}", "draw_result.json")
         if not os.path.exists(draw_file):
-            print(f"未找到抽题结果: {draw_file}")
+            print(f"Draw result not found: {draw_file}")
             return None
         
         with open(draw_file, 'r', encoding='utf-8') as f:
@@ -42,7 +42,7 @@ class ReportGenerator:
         
         drawn_questions = draw_data.get("drawn_questions", [])
         
-        # 读取周次信息
+        # Read week info
         info_file = os.path.join(QUESTIONS_DIR, f"week{week}", "info.json")
         week_title = f"Week {week}"
         if os.path.exists(info_file):
@@ -50,18 +50,18 @@ class ReportGenerator:
                 info = json.load(f)
                 week_title = info.get("title", week_title)
         
-        # 生成报告内容
+        # Generate report content
         report_lines = [
-            f"# Verilog作业报告 - Week {week}: {week_title}",
+            f"# Verilog Assignment Report - Week {week}: {week_title}",
             "",
-            f"**生成时间**: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
-            f"**题目数量**: {len(drawn_questions)}",
+            f"**Generated**: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
+            f"**Questions**: {len(drawn_questions)}",
             "",
             "---",
             "",
         ]
         
-        # 逐题生成（使用ID查找）
+        # Generate each question (using ID lookup)
         for idx, q_info in enumerate(drawn_questions, 1):
             q_content = self._generate_question_section(week, idx, q_info)
             report_lines.extend(q_content)
@@ -74,79 +74,79 @@ class ReportGenerator:
         with open(report_path, 'w', encoding='utf-8') as f:
             f.write("\n".join(report_lines))
         
-        print(f"报告已生成: {report_path}")
+        print(f"Report generated: {report_path}")
         return report_path
     
     def _generate_question_section(self, week: int, index: int, q_info: dict) -> List[str]:
         """
-        生成单个题目的报告段落
+        Generate report section for single question
         
         Args:
-            week: 周次
-            index: 题目序号（从1开始）
-            q_info: 题目信息字典（包含id, folder, title）
+            week: Week number
+            index: Question index (starting from 1)
+            q_info: Question info dict (contains id, folder, title)
             
         Returns:
-            Markdown行列表
+            List of Markdown lines
         """
         qid = q_info['id']
-        title = q_info.get('title', f'题目{index}')
+        title = q_info.get('title', f'Question {index}')
         
-        lines = [f"## 题目 {index} (ID: {qid})",
-                 f"**标题**: {title}",
+        lines = [f"## Question {index} (ID: {qid})",
+                 f"**Title**: {title}",
                  ""]
         
-        # 1. 题目描述（使用ID目录）
+        # 1. Question description (using ID directory)
         question_md = self._load_question_markdown(week, qid)
         if question_md:
             question_md = self._filter_images(question_md)
-            lines.extend(["### 题目描述", "", question_md])
+            lines.extend(["### Question Description", "", question_md])
         
-        # 2. 学生代码（使用ID命名）
+        # 2. Student code (using ID naming)
         code = self._load_student_code(week, qid)
         if code:
-            lines.extend(["", "### 学生代码", "", "```verilog", code, "```"])
+            lines.extend(["", "### Student Code", "", "```verilog", code, "```"])
         else:
-            lines.extend(["", "### 学生代码", "", "*未提交代码*"])
+            lines.extend(["", "### Student Code", "", "*No code submitted*"])
         
-        # 3. 测试结果（使用ID命名）
+        # 3. Test results (using ID naming)
         result = self._load_test_result(week, qid)
         if result:
-            lines.extend(["", "### 测试结果", ""])
+            lines.extend(["", "### Test Results", ""])
             
-            # 检查编译和运行状态
+            # Check compile and run status
             compile_success = result.get("compile_success", False)
             run_success = result.get("run_success", False)
             
             if not compile_success:
-                error = result.get("error", "编译失败")
-                lines.append(f"**状态**: ❌ 编译失败")
+                error = result.get("error", "Compilation failed")
+                lines.append(f"**Status**: ❌ Compilation Failed")
                 if error:
-                    lines.append(f"**错误**: {error}")
+                    lines.append(f"**Error**: {error}")
             elif not run_success:
-                error = result.get("error", "运行失败")
-                lines.append(f"**状态**: ❌ 运行失败")
+                error = result.get("error", "Execution failed")
+                lines.append(f"**Status**: ❌ Execution Failed")
                 if error:
-                    lines.append(f"**错误**: {error}")
+                    lines.append(f"**Error**: {error}")
             else:
-                # 编译和运行都成功
-                lines.append(f"**状态**: ✅ 测试完成")
+                # Both compile and run successful
+                lines.append(f"**Status**: ✅ Test Completed")
                 lines.append("")
                 
-                # 添加仿真输出（如果有）
+                # Add simulation output (if any)
                 output = result.get("output", "")
                 if output:
-                    lines.append("**仿真输出**:")
+                    lines.append("**Simulation Output**:")
                     lines.append("```")
                     lines.append(output[:500] if len(output) > 500 else output)
                     lines.append("```")
         else:
-            lines.extend(["", "### 测试结果", "", "*尚未测试*"])
+            lines.extend(["", "### Test Results", "", "*Not tested yet*"])
         
         return lines
     
     def _load_question_markdown(self, week: int, qid: str) -> str:
-        """加载题目描述（使用ID作为目录名）"""
+        """Load question description (using ID as directory name)"""
         md_file = os.path.join(QUESTIONS_DIR, f"week{week}", qid, "question.md")
         if os.path.exists(md_file):
             with open(md_file, 'r', encoding='utf-8') as f:
@@ -154,12 +154,12 @@ class ReportGenerator:
         return ""
     
     def _filter_images(self, markdown: str) -> str:
-        """过滤Markdown中的图片语法"""
-        result = re.sub(r'!\[([^\]]*)\]\([^\)]+\)', r'[图片: \1]', markdown)
+        """Filter image syntax from Markdown"""
+        result = re.sub(r'!\[([^\]]*)\]\([^\)]+\)', r'[Image: \1]', markdown)
         return result
     
     def _load_student_code(self, week: int, qid: str) -> str:
-        """加载学生代码（使用ID命名，按题目子文件夹组织）"""
+        """Load student code (using ID naming, organized by question subfolder)"""
         code_file = os.path.join(SUBMISSIONS_DIR, f"week{week}", qid, f"{qid}.v")
         if os.path.exists(code_file):
             with open(code_file, 'r', encoding='utf-8') as f:
@@ -167,7 +167,7 @@ class ReportGenerator:
         return ""
     
     def _load_test_result(self, week: int, qid: str) -> Optional[Dict]:
-        """加载测试结果（使用ID命名，按题目子文件夹组织）"""
+        """Load test results (using ID naming, organized by question subfolder)"""
         result_file = os.path.join(SUBMISSIONS_DIR, f"week{week}", qid, "result.json")
         if os.path.exists(result_file):
             with open(result_file, 'r', encoding='utf-8') as f:
@@ -175,15 +175,15 @@ class ReportGenerator:
         return None
     
     def _format_result_table(self, result: Dict) -> str:
-        """格式化结果为Markdown表格"""
+        """Format result as Markdown table"""
         comparisons = result.get("comparisons", [])
         if not comparisons:
-            return "无数据"
+            return "No data"
         
         all_signals = result.get("signals", [])
         
-        # 构建表头
-        headers = ["时间(ns)"] + all_signals + ["结果"]
+        # Build table headers
+        headers = ["Time(ns)"] + all_signals + ["Result"]
         lines = [
             "| " + " | ".join(headers) + " |",
             "|" + "|".join(["------"] * len(headers)) + "|"

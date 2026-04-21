@@ -6,12 +6,12 @@ from ui.app import VerilogQuizApp
 
 
 def main(page: ft.Page):
-    """程序入口"""
+    """Application entry"""
     VerilogQuizApp(page)
 
 
 def run_app():
-    """启动应用"""
+    """Launch application"""
     ft.run(main)
 
 
