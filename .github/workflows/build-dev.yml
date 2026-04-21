@@ -1,6 +1,7 @@
 name: Build Dev
 
-# 触发条件：除 main 分支外的其他分支 push	on:
+# 触发条件：除 main 分支外的其他分支 push
+on:
   push:
     branches-ignore:
       - main
@@ -48,4 +49,4 @@ jobs:
         with:
           name: verilog-quiz-${{ matrix.target }}-dev
           path: dist/*
-          retention-days: 7    # 开发版本只保留7天
+          retention-days: 7
