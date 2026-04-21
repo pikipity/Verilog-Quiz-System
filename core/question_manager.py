@@ -206,7 +206,7 @@ class QuestionManager:
     
     def _download_question(self, week_str: str, q_info: dict, week_dir: str) -> bool:
         """
-        下载单个题目
+        下载单个题目（包含资源文件）
         
         Args:
             week_str: 周次字符串（如week1）
@@ -216,6 +216,8 @@ class QuestionManager:
         Returns:
             是否成功
         """
+        import re
+        
         folder = q_info['folder']
         qid = q_info['id']
         
@@ -231,6 +233,7 @@ class QuestionManager:
         ]
         
         try:
+            # 1. 下载基本文件
             for remote_name, local_name in files_to_download:
                 url = f"{base_url}/{remote_name}"
                 response = self.session.get(url, timeout=10)
@@ -263,6 +266,35 @@ class QuestionManager:
                     # 明文保存其他文件
                     with open(local_path, 'w', encoding='utf-8', newline='\n') as f:
                         f.write(content)
+            
+            # 2. 解析 question.md 中的图片链接并下载
+            question_md_path = os.path.join(q_dir, "question.md")
+            if os.path.exists(question_md_path):
+                with open(question_md_path, 'r', encoding='utf-8') as f:
+                    md_content = f.read()
+                
+                # 匹配 Markdown 图片语法: ![alt](path)
+                image_pattern = r'!\[([^\]]*)\]\((?!http://|https://|data:)([^)]+)\)'
+                images = re.findall(image_pattern, md_content)
+                
+                for alt_text, img_path in images:
+                    # 下载图片
+                    img_url = f"{base_url}/{img_path}"
+                    try:
+                        img_response = self.session.get(img_url, timeout=10)
+                        if img_response.status_code == 200:
+                            # 创建图片目录
+                            img_local_path = os.path.join(q_dir, img_path)
+                            os.makedirs(os.path.dirname(img_local_path), exist_ok=True)
+                            
+                            # 保存图片（二进制）
+                            with open(img_local_path, 'wb') as f:
+                                f.write(img_response.content)
+                            print(f"已下载图片: {qid}/{img_path}")
+                        else:
+                            print(f"下载图片失败 {img_path}: {img_response.status_code}")
+                    except Exception as e:
+                        print(f"下载图片出错 {img_path}: {e}")
             
             return True
             

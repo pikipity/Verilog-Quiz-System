@@ -20,7 +20,7 @@ from core.crypto_manager import crypto_manager
 
 
 class QuestionView:
-    """答题界面组件"""
+    """Question View Component"""
     
     def __init__(self, app):
         self.app = app
@@ -33,7 +33,7 @@ class QuestionView:
         self.question_info = None  # 题目完整信息（含folder, title）
     
     def build(self, week: int, question_index: int) -> ft.Control:
-        """构建答题界面"""
+        """Build question view"""
         self.week = week
         self.question_index = question_index
         
@@ -42,8 +42,8 @@ class QuestionView:
         
         if not self.question_id:
             return ft.Column([
-                ft.Text("题目加载失败", size=24, color=ft.Colors.RED),
-                ft.ElevatedButton("返回", on_click=lambda e: self.app.show_week_selector())
+                ft.Text("Failed to load question", size=24, color=ft.Colors.RED),
+                ft.ElevatedButton("Back", on_click=lambda e: self.app.show_week_selector())
             ])
         
         # 加载已有代码（使用ID命名）
@@ -63,7 +63,7 @@ class QuestionView:
                 # 题目描述
                 self._build_question_panel(),
                 ft.Divider(height=1),
-                # 代码编辑器
+                # Code editor
                 self._build_editor_panel(existing_code),
                 ft.Divider(height=1),
                 # 测试平台
@@ -89,7 +89,7 @@ class QuestionView:
                 [
                     ft.IconButton(
                         icon=ft.Icons.ARROW_BACK,
-                        tooltip="返回周次列表",
+                        tooltip="Back to week list",
                         on_click=lambda e: self.app.show_week_selector(),
                     ),
                     ft.Column(
@@ -122,7 +122,7 @@ class QuestionView:
         )
     
     def _build_question_selector(self) -> ft.Control:
-        """构建题目选择块（快速跳转）"""
+        """Build question selector (quick jump)"""
         total = len(self.app.drawn_questions) if self.app.drawn_questions else 0
         
         if total == 0:
@@ -177,7 +177,7 @@ class QuestionView:
         return ft.Container(
             content=ft.Column(
                 [
-                    ft.Text("题目选择", size=14, weight=ft.FontWeight.BOLD),
+                    ft.Text("Question Selection", size=14, weight=ft.FontWeight.BOLD),
                     ft.Divider(height=1),
                     ft.Row(
                         question_buttons,
@@ -194,7 +194,7 @@ class QuestionView:
         )
     
     def _is_question_completed(self, index: int, question_id: str) -> bool:
-        """检查指定题目是否已完成"""
+        """Check if specified question is completed"""
         if not question_id:
             return False
         
@@ -216,7 +216,7 @@ class QuestionView:
         return False
     
     def _on_question_select(self, index: int):
-        """题目选择按钮点击"""
+        """Question selection button click"""
         if index != self.question_index:
             # 先保存当前代码
             self._save_code()
@@ -224,13 +224,13 @@ class QuestionView:
             self.app.navigate_to_question(index)
     
     def _build_question_panel(self) -> ft.Control:
-        """构建题目显示面板"""
+        """Build question display panel"""
         question_md = self._load_question_markdown()
         
         return ft.Container(
             content=ft.Column(
                 [
-                    ft.Text("题目描述", size=16, weight=ft.FontWeight.BOLD),
+                    ft.Text("Question Description", size=16, weight=ft.FontWeight.BOLD),
                     ft.Divider(height=1),
                     ft.Markdown(
                         question_md,
@@ -247,20 +247,20 @@ class QuestionView:
         )
     
     def _build_editor_panel(self, existing_code: str) -> ft.Control:
-        """构建代码编辑面板（带行号）"""
+        """Build code editor panel (with line numbers)"""
         self.current_code = existing_code
         
-        # 自动保存函数（当焦点移出时）
+        # Auto-save function (when focus is lost)
         def on_blur_save(e):
-            """焦点移出时自动保存"""
+            """Auto-save when focus is lost"""
             if self._save_code():
-                print(f"自动保存: {self.question_id}.v")
+                print(f"Auto-saved: {self.question_id}.v")
         
-        # 计算行号
+        # Calculate line numbers
         line_count = existing_code.count('\n') + 1 if existing_code else 1
         line_numbers_text = '\n'.join(str(i) for i in range(1, line_count + 1))
         
-        # 行号显示组件（只读）
+        # Line number display component (read-only)
         self.editor_line_numbers = ft.TextField(
             value=line_numbers_text,
             multiline=True,
@@ -289,9 +289,9 @@ class QuestionView:
                 size=CODE_FONT_SIZE,
             ),
             border_color=ft.Colors.BLUE_400,
-            hint_text="在此编写Verilog代码...",
+            hint_text="Write your Verilog code here...",
             on_change=self._on_code_change_with_line_numbers,
-            on_blur=on_blur_save,  # 焦点移出时自动保存
+            on_blur=on_blur_save,  # Auto-save when focus is lost
             expand=True,
             content_padding=ft.padding.only(left=8, top=12, bottom=12),
         )
@@ -299,7 +299,7 @@ class QuestionView:
         return ft.Container(
             content=ft.Column(
                 [
-                    ft.Text("代码编辑器", size=16, weight=ft.FontWeight.BOLD),
+                    ft.Text("Code Editor", size=16, weight=ft.FontWeight.BOLD),
                     ft.Divider(height=1),
                     ft.Row(
                         [
@@ -319,12 +319,12 @@ class QuestionView:
         )
     
     def _build_testbench_panel(self, testbench_code: str) -> ft.Control:
-        """构建testbench显示面板（只读，带行号）"""
+        """Build testbench panel (read-only, with line numbers)"""
         # 计算行号
         line_count = testbench_code.count('\n') + 1 if testbench_code else 1
         line_numbers_text = '\n'.join(str(i) for i in range(1, line_count + 1))
         
-        # 行号显示
+        # Line numbers display
         tb_line_numbers = ft.TextField(
             value=line_numbers_text,
             multiline=True,
@@ -342,7 +342,7 @@ class QuestionView:
             content_padding=ft.padding.only(left=8, right=4, top=12, bottom=12),
         )
         
-        # testbench代码显示
+        # Testbench code display
         tb_code = ft.TextField(
             value=testbench_code,
             multiline=True,
@@ -362,7 +362,7 @@ class QuestionView:
         return ft.Container(
             content=ft.Column(
                 [
-                    ft.Text("测试平台 (Testbench)", size=16, weight=ft.FontWeight.BOLD),
+                    ft.Text("Testbench", size=16, weight=ft.FontWeight.BOLD),
                     ft.Divider(height=1),
                     ft.Row(
                         [
@@ -382,9 +382,9 @@ class QuestionView:
         )
     
     def _load_testbench_code(self) -> str:
-        """加载testbench代码"""
+        """Load testbench code"""
         if not self.question_id:
-            return "// 无法加载testbench"
+            return "// Cannot load testbench"
         
         tb_path = os.path.join(
             QUESTIONS_DIR, 
@@ -397,22 +397,22 @@ class QuestionView:
             try:
                 with open(tb_path, 'r', encoding='utf-8') as f:
                     content = f.read()
-                    # 统一换行符为 \n，避免 Windows \r\n 导致的多余空行
+                    # Normalize line endings to \n to avoid extra blank lines from Windows \r\n
                     return content.replace('\r\n', '\n')
             except Exception as e:
-                return f"// 读取testbench失败: {e}"
+                return f"// Failed to read testbench: {e}"
         
-        return "// testbench文件不存在"
+        return "// Testbench file does not exist"
     
     def _build_footer(self) -> ft.Control:
-        """构建底部操作栏"""
+        """Build footer action bar"""
         self.status_text = ft.Text(
-            "就绪",
+            "Ready",
             size=12,
             color=ft.Colors.GREY,
         )
         
-        # 判断是否是第一题
+        # Check if this is the first question
         is_first = self.question_index == 0
         
         return ft.Container(
@@ -422,13 +422,13 @@ class QuestionView:
                     ft.Row(
                         [
                             ft.ElevatedButton(
-                                "上一题",
+                                "Previous",
                                 icon=ft.Icons.ARROW_BACK,
                                 on_click=self._on_prev_question,
                                 disabled=is_first,
                             ),
                             ft.ElevatedButton(
-                                "运行测试",
+                                "Run Test",
                                 icon=ft.Icons.PLAY_ARROW,
                                 on_click=self._on_run_test,
                                 style=ft.ButtonStyle(
@@ -437,7 +437,7 @@ class QuestionView:
                                 ),
                             ),
                             ft.ElevatedButton(
-                                "保存并继续",
+                                "Save & Continue",
                                 icon=ft.Icons.SAVE,
                                 on_click=self._on_save_and_continue,
                             ),
@@ -451,8 +451,8 @@ class QuestionView:
         )
     
     def _load_question_info(self):
-        """加载题目信息（包括ID、folder、title）"""
-        # 读取抽题结果
+        """Load question info (including ID, folder, title)"""
+        # Read draw result
         draw_file = os.path.join(QUESTIONS_DIR, f"week{self.week}", "draw_result.json")
         
         if os.path.exists(draw_file):
@@ -465,36 +465,87 @@ class QuestionView:
                         self.question_info = self.app.drawn_questions[self.question_index]
                         self.question_id = self.question_info['id']
             except Exception as e:
-                print(f"读取抽题结果失败: {e}")
+                print(f"Failed to read draw result: {e}")
     
     def _load_question_markdown(self) -> str:
-        """加载题目Markdown内容（使用ID作为目录名）"""
-        if not self.question_id:
-            return "# 题目加载失败\n\n请返回重新选择周次。"
+        """Load question Markdown content (using ID as directory name)"""
+        import base64
         
-        # 使用ID作为子目录名
+        if not self.question_id:
+            return "# Failed to load question\n\nPlease return and reselect the week."
+        
+        # Use ID as subdirectory name
         md_file = os.path.join(
             QUESTIONS_DIR, 
             f"week{self.week}", 
-            self.question_id,  # 使用ID
+            self.question_id,
             "question.md"
         )
         
         if os.path.exists(md_file):
             try:
                 with open(md_file, 'r', encoding='utf-8') as f:
-                    return f.read()
+                    content = f.read()
+                
+                # Convert local images to base64 for embedded display
+                question_dir = os.path.dirname(md_file)
+                
+                def replace_image_with_base64(match):
+                    alt_text = match.group(1)
+                    img_path = match.group(2)
+                    
+                    # Skip if already a URL or data URI
+                    if img_path.startswith(('http://', 'https://', 'data:')):
+                        return match.group(0)
+                    
+                    # Get absolute path to image
+                    abs_img_path = os.path.join(question_dir, img_path)
+                    
+                    if os.path.exists(abs_img_path):
+                        try:
+                            # Read image and convert to base64
+                            with open(abs_img_path, 'rb') as img_file:
+                                img_data = img_file.read()
+                                base64_data = base64.b64encode(img_data).decode('utf-8')
+                            
+                            # Determine MIME type from extension
+                            ext = os.path.splitext(img_path)[1].lower()
+                            mime_types = {
+                                '.png': 'image/png',
+                                '.jpg': 'image/jpeg',
+                                '.jpeg': 'image/jpeg',
+                                '.gif': 'image/gif',
+                                '.svg': 'image/svg+xml',
+                                '.bmp': 'image/bmp',
+                                '.webp': 'image/webp'
+                            }
+                            mime_type = mime_types.get(ext, 'image/png')
+                            
+                            return f'![{alt_text}](data:{mime_type};base64,{base64_data})'
+                        except Exception as e:
+                            print(f"Failed to embed image {img_path}: {e}")
+                            return f'![{alt_text}]({img_path})'
+                    else:
+                        print(f"Image not found: {abs_img_path}")
+                        return f'![{alt_text}]({img_path})'
+                
+                content = re.sub(
+                    r'!\[([^\]]*)\]\(([^)]+)\)',
+                    replace_image_with_base64,
+                    content
+                )
+                return content
             except Exception as e:
-                return f"# 读取题目失败\n\n{e}"
+                return f"# Failed to read question\n\n{e}"
         
-        return "# 题目文件不存在\n\n请检查更新。"
+        return "# Question file does not exist\n\nPlease check for updates."
     
     def _load_existing_code(self) -> str:
-        """加载已有的代码（使用ID命名，按题目子文件夹组织）"""
+        """Load existing code (using ID naming, organized by question subfolder)"""
         if not self.question_id:
             return self._get_code_template()
         
-        # 使用ID作为子目录和文件名
+        # Use ID as subdirectory and filename
         code_file = os.path.join(
             SUBMISSIONS_DIR,
             f"week{self.week}",
@@ -506,38 +557,38 @@ class QuestionView:
             try:
                 with open(code_file, 'r', encoding='utf-8') as f:
                     content = f.read()
-                    # 统一换行符为 \n，避免 Windows \r\n 导致的多余空行
+                    # Normalize line endings to \n to avoid extra blank lines from Windows \r\n
                     return content.replace('\r\n', '\n')
             except Exception as e:
-                print(f"读取已有代码失败: {e}")
+                print(f"Failed to read existing code: {e}")
         
         return self._get_code_template()
     
     def _get_code_template(self) -> str:
-        """获取代码模板"""
-        return """// 在此编写你的Verilog代码
+        """Get code template"""
+        return """// Write your Verilog code here
 
 module my_module (
-    // 定义端口
+    // Define ports
 );
     
-    // 实现逻辑
+    // Implement logic
     
 endmodule
 """
     
     def _on_code_change(self, e):
-        """代码改变事件"""
+        """Code change event"""
         self._update_code_status(e.control.value)
     
     def _on_code_change_with_line_numbers(self, e):
-        """代码改变事件（同步更新行号）"""
+        """Code change event (sync update line numbers)"""
         value = e.control.value
         self._update_code_status(value)
         self._update_editor_line_numbers(value)
     
     def _update_editor_line_numbers(self, code: str):
-        """更新代码编辑器行号"""
+        """Update code editor line numbers"""
         if hasattr(self, 'editor_line_numbers'):
             line_count = code.count('\n') + 1 if code else 1
             line_numbers_text = '\n'.join(str(i) for i in range(1, line_count + 1))
@@ -545,46 +596,46 @@ endmodule
             self.editor_line_numbers.update()
     
     def _update_code_status(self, value: str):
-        """更新代码状态"""
+        """Update code status"""
         self.current_code = value
-        self.status_text.value = "有未保存的更改"
+        self.status_text.value = "Unsaved changes"
         self.status_text.color = ft.Colors.ORANGE
         self.status_text.update()
     
     def _save_code(self) -> bool:
-        """保存代码（使用ID命名，按题目子文件夹组织）"""
+        """Save code (using ID naming, organized by question subfolder)"""
         if not self.question_id:
             return False
         
-        # 确保目录存在：submissions/weekX/question_id/
+        # Ensure directory exists: submissions/weekX/question_id/
         question_dir = os.path.join(SUBMISSIONS_DIR, f"week{self.week}", self.question_id)
         os.makedirs(question_dir, exist_ok=True)
         
-        # 保存代码文件
+        # Save code file
         code_file = os.path.join(question_dir, f"{self.question_id}.v")
         
         try:
-            # 保存时统一使用 \n 作为换行符
+            # Use \n as line ending when saving
             normalized_code = self.current_code.replace('\r\n', '\n').replace('\r', '\n')
             with open(code_file, 'w', encoding='utf-8', newline='\n') as f:
                 f.write(normalized_code)
             
-            # 更新进度
+            # Update progress
             self._update_progress()
             
-            self.status_text.value = f"已保存 {datetime.now().strftime('%H:%M:%S')}"
+            self.status_text.value = f"Saved {datetime.now().strftime('%H:%M:%S')}"
             self.status_text.color = ft.Colors.GREEN
             self.status_text.update()
             
             return True
         except Exception as e:
-            self.status_text.value = f"保存失败: {e}"
+            self.status_text.value = f"Save failed: {e}"
             self.status_text.color = ft.Colors.RED
             self.status_text.update()
             return False
     
     def _update_progress(self, status: str = "in_progress"):
-        """更新进度文件（使用ID记录，保存在题目子文件夹中）"""
+        """Update progress file (record with ID, saved in question subfolder)"""
         question_dir = os.path.join(SUBMISSIONS_DIR, f"week{self.week}", self.question_id)
         os.makedirs(question_dir, exist_ok=True)
         
@@ -592,7 +643,7 @@ endmodule
         
         progress_data = {}
         
-        # 读取现有进度
+        # Read existing progress
         if os.path.exists(progress_file):
             try:
                 with open(progress_file, 'r', encoding='utf-8') as f:
@@ -600,7 +651,7 @@ endmodule
             except Exception:
                 pass
         
-        # 更新当前题目状态
+        # Update current question status
         progress_data.update({
             "question_id": self.question_id,
             "index": self.question_index,
@@ -613,13 +664,13 @@ endmodule
             with open(progress_file, 'w', encoding='utf-8') as f:
                 json.dump(progress_data, f, ensure_ascii=False, indent=2)
         except Exception as e:
-            print(f"更新进度失败: {e}")
+            print(f"Failed to update progress: {e}")
         
-        # 同时更新周总体进度文件
+        # Also update weekly progress file
         self._update_week_progress(status)
     
     def _update_week_progress(self, status: str = "in_progress"):
-        """更新周总体进度文件（供week_selector读取）"""
+        """Update weekly progress file (for week_selector to read)"""
         week_dir = os.path.join(SUBMISSIONS_DIR, f"week{self.week}")
         os.makedirs(week_dir, exist_ok=True)
         
@@ -627,7 +678,7 @@ endmodule
         
         week_data = {"questions": {}}
         
-        # 读取现有周进度
+        # Read existing weekly progress
         if os.path.exists(week_progress_file):
             try:
                 with open(week_progress_file, 'r', encoding='utf-8') as f:
@@ -649,23 +700,23 @@ endmodule
             with open(week_progress_file, 'w', encoding='utf-8') as f:
                 json.dump(week_data, f, ensure_ascii=False, indent=2)
         except Exception as e:
-            print(f"更新周进度失败: {e}")
+            print(f"Failed to update weekly progress: {e}")
     
     def _on_run_test(self, e):
-        """运行测试按钮点击"""
+        """Run test button click"""
         if not self._save_code():
-            self.app.show_snackbar("保存代码失败，无法测试", ft.Colors.RED)
+            self.app.show_snackbar("Failed to save code, cannot test", ft.Colors.RED)
             return
         
-        # 运行测试
+        # Run test
         self._run_test_workflow()
     
     def _run_test_workflow(self):
-        """运行完整测试流程（临时文件放在submissions对应题目目录下）"""
+        """Run complete test workflow (temp files in submissions question directory)"""
         import threading
         
-        # 显示加载遮罩
-        loading_text = ft.Text("正在准备测试环境...", size=16, color=ft.Colors.WHITE)
+        # Show loading overlay
+        loading_text = ft.Text("Preparing test environment...", size=16, color=ft.Colors.WHITE)
         loading_overlay = ft.Container(
             content=ft.Column(
                 [
@@ -684,20 +735,20 @@ endmodule
         self.app.page.update()
         
         def update_message(msg: str):
-            """更新进度消息（线程安全）"""
+            """Update progress message (thread-safe)"""
             def _update():
                 loading_text.value = msg
                 self.app.page.update()
             self.app.page.run_thread(_update)
         
         def show_snackbar_safe(text, color):
-            """安全显示提示"""
+            """Safely show snackbar"""
             def _show():
                 self.app.show_snackbar(text, color)
             self.app.page.run_thread(_show)
         
         def close_overlay():
-            """关闭遮罩"""
+            """Close overlay"""
             def _close():
                 try:
                     if loading_overlay in self.app.page.overlay:
@@ -708,76 +759,76 @@ endmodule
             self.app.page.run_thread(_close)
         
         def run_test_thread():
-            """在后台线程中运行测试"""
+            """Run test in background thread"""
             try:
-                # 1. 获取参考代码
-                update_message("正在获取参考答案...")
+                # 1. Get reference code
+                update_message("Getting reference answer...")
                 ref_code = question_manager.get_reference_code(self.week, self.question_id)
                 
-                # 2. 创建临时工作目录
-                update_message("正在准备仿真环境...")
+                # 2. Create temp working directory
+                update_message("Preparing simulation environment...")
                 question_dir = os.path.join(SUBMISSIONS_DIR, f"week{self.week}", self.question_id)
                 temp_dir = os.path.join(question_dir, "temp")
                 os.makedirs(temp_dir, exist_ok=True)
                 
                 if ref_code is None:
-                    show_snackbar_safe("无法获取参考答案", ft.Colors.RED)
+                    show_snackbar_safe("Cannot get reference answer", ft.Colors.RED)
                     close_overlay()
                     return
                 
-                # 3. 读取testbench
-                update_message("正在读取测试平台...")
+                # 3. Read testbench
+                update_message("Reading testbench...")
                 tb_path = os.path.join(QUESTIONS_DIR, f"week{self.week}", self.question_id, "testbench.v")
                 
                 if not os.path.exists(tb_path):
-                    show_snackbar_safe("未找到testbench文件", ft.Colors.RED)
+                    show_snackbar_safe("Testbench file not found", ft.Colors.RED)
                     close_overlay()
                     return
                 
                 with open(tb_path, 'r', encoding='utf-8') as f:
                     testbench = f.read()
                 
-                # 4. 写入学生代码
+                # 4. Write student code
                 student_file = os.path.join(temp_dir, "student.v")
                 with open(student_file, 'w', encoding='utf-8') as f:
                     f.write(self.current_code)
                 
-                # 5. 写入参考代码
+                # 5. Write reference code
                 ref_file = os.path.join(temp_dir, "reference.v")
                 with open(ref_file, 'w', encoding='utf-8') as f:
                     f.write(ref_code)
                 
-                # 6. 执行参考代码测试
-                update_message("正在运行参考答案仿真...")
+                # 6. Execute reference code test
+                update_message("Running reference simulation...")
                 ref_result = code_executor.execute([ref_file, tb_path], temp_dir, "ref.vvp")
                 
-                # 7. 执行学生代码测试
-                update_message("正在运行学生代码仿真...")
+                # 7. Execute student code test
+                update_message("Running student code simulation...")
                 student_result = code_executor.execute([student_file, tb_path], temp_dir, "student.vvp")
                 
-                # 8. 保存结果
-                update_message("正在保存测试结果...")
+                # 8. Save results
+                update_message("Saving test results...")
                 self._save_test_result(student_result)
                 
-                # 9. 显示结果和更新UI（在主线程中）
+                # 9. Display results and update UI (in main thread)
                 def update_ui():
                     self._show_test_result_dialog(student_result, ref_result, testbench)
                     
                     if student_result.compile_success:
                         if student_result.run_success:
-                            self.status_text.value = "测试完成"
+                            self.status_text.value = "Test completed"
                             self.status_text.color = ft.Colors.GREEN
                         else:
-                            self.status_text.value = "运行失败"
+                            self.status_text.value = "Execution failed"
                             self.status_text.color = ft.Colors.RED
                     else:
-                        self.status_text.value = "编译失败"
+                        self.status_text.value = "Compilation failed"
                         self.status_text.color = ft.Colors.RED
                     
                     self.status_text.update()
                     close_overlay()
                     
-                    # 清理临时文件（只保留.vcd）
+                    # Clean up temp files (only keep .vcd)
                     try:
                         if os.path.exists(temp_dir):
                             for filename in os.listdir(temp_dir):
@@ -793,27 +844,27 @@ endmodule
                 
             except Exception as e:
                 def show_error():
-                    self.app.show_snackbar(f"测试异常: {str(e)}", ft.Colors.RED)
-                    self.status_text.value = "测试失败"
+                    self.app.show_snackbar(f"Test exception: {str(e)}", ft.Colors.RED)
+                    self.status_text.value = "Test failed"
                     self.status_text.color = ft.Colors.RED
                     self.status_text.update()
                     close_overlay()
                 self.app.page.run_thread(show_error)
         
-        # 启动后台线程运行测试
+        # Start background thread to run test
         threading.Thread(target=run_test_thread, daemon=True).start()
     
     def _extract_input_output_signals(self, testbench: str) -> tuple:
-        """从testbench中提取输入信号和输出信号名
+        """Extract input and output signal names from testbench
         
         Returns:
-            (input_signals, output_signals) - 两个列表
+            (input_signals, output_signals) - two lists
         """
         input_signals = []
         output_signals = []
         
-        # 方法1: 从 reg/wire 定义中识别
-        # 在testbench中，输入通常是reg，输出通常是wire
+        # Method 1: Identify from reg/wire definitions
+        # In testbench, inputs are usually reg, outputs are usually wire
         for match in re.finditer(r'\b(reg)\s+(?:\[.*?\])?\s*(\w+)', testbench):
             sig = match.group(2)
             if sig not in input_signals:
@@ -824,19 +875,19 @@ endmodule
             if sig not in output_signals:
                 output_signals.append(sig)
         
-        # 方法2: 如果没找到，从 $display 中提取，
-        # 但假设最后一个信号是输出（常见模式）
+        # Method 2: If not found, extract from $display
+        # Assume last signal is output (common pattern)
         if not input_signals and not output_signals:
-            # 匹配 $display 语句
+            # Match $display statements
             pattern = r'\$display\s*\([^)]*"[^"]*"\s*,\s*([^)]+)\)'
             for match in re.finditer(pattern, testbench):
-                # 提取参数列表
+                # Extract argument list
                 args_str = match.group(1)
-                # 分割参数
+                # Split arguments
                 args = [arg.strip() for arg in args_str.split(',')]
-                # 排除 $time 或 $time
+                # Exclude $time
                 signal_args = [arg for arg in args if not arg.startswith('$')]
-                # 除最后一个外都是输入，最后一个是输出
+                # All except last are inputs, last is output
                 if len(signal_args) >= 2:
                     input_signals = signal_args[:-1]
                     output_signals = [signal_args[-1]]
@@ -844,13 +895,13 @@ endmodule
         return input_signals, output_signals
     
     def _show_test_result_dialog(self, student_result: ExecutionResult, ref_result: ExecutionResult, testbench: str):
-        """显示测试结果对话框（显示波形图）"""
-        # 提取所有信号
+        """Show test result dialog (display waveform)"""
+        # Extract all signals
         all_signals = self._extract_all_signals(ref_result.output or student_result.output)
-        # 从testbench中提取输入和输出信号
+        # Extract input and output signals from testbench
         input_signals, output_signals = self._extract_input_output_signals(testbench)
         
-        # 使用result_analyzer分析结果
+        # Use result_analyzer to analyze results
         if ref_result.output and student_result.output:
             analysis = result_analyzer.analyze_from_display(
                 ref_result.output,
@@ -860,41 +911,41 @@ endmodule
         else:
             analysis = None
         
-        # 构建对话框内容
+        # Build dialog content
         content_controls = []
         
-        # 编译状态
+        # Compilation status
         if not student_result.compile_success:
             content_controls.extend([
-                ft.Text("编译失败", size=18, color=ft.Colors.RED, weight=ft.FontWeight.BOLD),
-                ft.Text(student_result.error or "未知错误", selectable=True),
+                ft.Text("Compilation Failed", size=18, color=ft.Colors.RED, weight=ft.FontWeight.BOLD),
+                ft.Text(student_result.error or "Unknown error", selectable=True),
             ])
         else:
             if analysis and analysis.success and analysis.comparisons:
-                # 按信号组织波形数据
+                # Organize waveform data by signal
                 signal_data = self._organize_waveform_data(analysis.comparisons, all_signals, input_signals, output_signals)
                 
-                # 绘制完整的波形图（所有信号在一起）
+                # Draw complete waveform (all signals together)
                 waveform_container = self._build_combined_waveform(
                     signal_data, input_signals, output_signals
                 )
                 content_controls.append(waveform_container)
             else:
-                # 显示原始输出
+                # Display raw output
                 content_controls.extend([
-                    ft.Text("参考输出:", weight=ft.FontWeight.BOLD),
-                    ft.Text(ref_result.output or "(无输出)", selectable=True, size=12),
+                    ft.Text("Reference Output:", weight=ft.FontWeight.BOLD),
+                    ft.Text(ref_result.output or "(no output)", selectable=True, size=12),
                     ft.Divider(),
-                    ft.Text("学生输出:", weight=ft.FontWeight.BOLD),
-                    ft.Text(student_result.output or "(无输出)", selectable=True, size=12),
+                    ft.Text("Student Output:", weight=ft.FontWeight.BOLD),
+                    ft.Text(student_result.output or "(no output)", selectable=True, size=12),
                 ])
                 if student_result.error:
                     content_controls.extend([
-                        ft.Text("错误信息:", weight=ft.FontWeight.BOLD, color=ft.Colors.RED),
+                        ft.Text("Error Message:", weight=ft.FontWeight.BOLD, color=ft.Colors.RED),
                         ft.Text(student_result.error, selectable=True, color=ft.Colors.RED),
                     ])
         
-        # 创建对话框
+        # Create dialog
         def close_dialog(e):
             dialog.open = False
             self.app.page.update()
@@ -902,10 +953,10 @@ endmodule
         content = ft.Column(content_controls, scroll=ft.ScrollMode.AUTO, height=500, width=750)
         
         dialog = ft.AlertDialog(
-            title=ft.Text("波形图"),
+            title=ft.Text("Waveform"),
             content=content,
             actions=[
-                ft.TextButton("关闭", on_click=close_dialog),
+                ft.TextButton("Close", on_click=close_dialog),
             ],
             actions_alignment=ft.MainAxisAlignment.END,
         )
@@ -915,7 +966,7 @@ endmodule
         self.app.page.update()
     
     def _organize_waveform_data(self, comparisons, all_signals, input_signals, output_signals):
-        """将对比数据按信号组织成波形数据"""
+        """Organize comparison data into waveform data by signal"""
         signal_data = {}
         
         for sig in all_signals:
@@ -924,13 +975,13 @@ endmodule
                 time = comp.time
                 val = comp.signal_values.get(sig, "0")
                 
-                # 对于输入信号，期望和实际是一样的（都使用 signal_values 的值）
+                # For input signals, expected and actual are the same (both use signal_values)
                 if sig in input_signals:
                     expected = val
                     actual = val
                     match = True
                 else:
-                    # 对于输出信号，分别获取期望和实际值
+                    # For output signals, get expected and actual values separately
                     expected = comp.expected_outputs.get(sig, val) if hasattr(comp, 'expected_outputs') else val
                     actual = comp.actual_outputs.get(sig, val) if hasattr(comp, 'actual_outputs') else val
                     match = comp.match if hasattr(comp, 'match') else True
@@ -946,11 +997,11 @@ endmodule
         return signal_data
     
     def _build_combined_waveform(self, signal_data: dict, input_signals: list, output_signals: list) -> ft.Control:
-        """构建完整的波形图（所有信号在一起）"""
+        """Build complete waveform (all signals together)"""
         if not signal_data:
             return ft.Container()
         
-        # 获取第一个信号的数据来计算时间范围
+        # Get first signal's data to calculate time range
         first_sig_data = None
         for sig_data in signal_data.values():
             if sig_data:
@@ -960,34 +1011,34 @@ endmodule
         if not first_sig_data:
             return ft.Container()
         
-        # 计算总时间范围
+        # Calculate total time range
         max_time = max(d['time'] for d in first_sig_data)
         min_time = min(d['time'] for d in first_sig_data)
         time_range = max(1, max_time - min_time)
         
-        # 波形图宽度
+        # Waveform width
         wave_width = 550
         time_scale = wave_width / time_range
         
-        # 收集所有要显示的信号（确保所有信号都有数据）
+        # Collect all signals to display (ensure all have data)
         all_display_signals = []
         
-        # 先显示输入信号
+        # Display input signals first
         for sig_name in input_signals:
             if sig_name in signal_data and signal_data[sig_name]:
                 all_display_signals.append({'name': sig_name, 'type': 'input'})
         
-        # 再显示输出信号
+        # Then display output signals
         for sig_name in output_signals:
             if sig_name in signal_data and signal_data[sig_name]:
                 all_display_signals.append({'name': sig_name, 'type': 'output'})
         
         if not all_display_signals:
-            return ft.Container(content=ft.Text("无信号数据"))
+            return ft.Container(content=ft.Text("No signal data"))
         
-        # 为每个信号构建一行
+        # Build a row for each signal
         signal_rows = []
-        row_height = 50  # 每个信号行的高度
+        row_height = 50  # Height of each signal row
         
         for i, sig_info in enumerate(all_display_signals):
             sig_name = sig_info['name']
@@ -996,13 +1047,13 @@ endmodule
             data = signal_data[sig_name]
             
             if sig_type == 'input':
-                # 输入信号只画一个波形（黑色）- 使用 actual 作为输入值（输入的期望和实际是一样的）
+                # Input signals draw one waveform (black) - use actual as input value (expected and actual are same for inputs)
                 segments = self._build_signal_waveform(
                     data, min_time, time_scale, 'actual', ft.Colors.BLACK, y_position + 10
                 )
                 label_text = sig_name
             else:
-                # 输出信号画两个波形：期望（蓝色）和实际（绿色）
+                # Output signals draw two waveforms: expected (blue) and actual (green)
                 expected_segments = self._build_signal_waveform(
                     data, min_time, time_scale, 'expected', ft.Colors.BLUE, y_position + 5
                 )
@@ -1010,7 +1061,7 @@ endmodule
                     data, min_time, time_scale, 'actual', ft.Colors.GREEN, y_position + 25
                 )
                 segments = expected_segments + actual_segments
-                label_text = f"{sig_name} (期望/实际)"
+                label_text = f"{sig_name} (exp/act)"
             
             signal_rows.append({
                 'name': label_text,
@@ -1022,12 +1073,12 @@ endmodule
         
         total_height = len(signal_rows) * row_height
         
-        # 构建波形区域 - 使用 Stack 放置所有波形段
+        # Build waveform area - use Stack to place all waveform segments
         all_segments = []
         for row in signal_rows:
             all_segments.extend(row['segments'])
         
-        # 添加分隔线
+        # Add separator lines
         for i in range(1, len(signal_rows)):
             sep_y = i * row_height
             separator = ft.Container(
@@ -1038,7 +1089,7 @@ endmodule
             )
             all_segments.append(separator)
         
-        # 时间轴基线
+        # Time axis baseline
         baseline = ft.Container(
             width=wave_width + 30,
             height=1,
@@ -1047,14 +1098,14 @@ endmodule
         )
         all_segments.append(baseline)
         
-        # 波形 Stack
+        # Waveform Stack
         waveform_stack = ft.Stack(
             all_segments,
             width=wave_width + 30,
             height=total_height,
         )
         
-        # 构建信号标签 - 使用固定高度的 Container 确保对齐
+        # Build signal labels - use fixed-height Container for alignment
         signal_labels = []
         for row in signal_rows:
             label_color = ft.Colors.BLUE if row['is_output'] else ft.Colors.BLACK
@@ -1067,12 +1118,12 @@ endmodule
                         weight=ft.FontWeight.BOLD
                     ),
                     height=row_height,
-                    alignment=ft.alignment.Alignment(-1, 0),  # 左对齐，垂直居中
+                    alignment=ft.alignment.Alignment(-1, 0),  # left align, vertical center
                     width=110,
                 )
             )
         
-        # 时间轴刻度
+        # Time axis labels
         time_labels = []
         for point in first_sig_data:
             time = point['time']
@@ -1084,37 +1135,37 @@ endmodule
                 )
             )
         
-        # 图例
+        # Legend
         legend = ft.Row([
             ft.Container(width=15, height=3, bgcolor=ft.Colors.BLACK),
-            ft.Text("输入", size=10),
+            ft.Text("Input", size=10),
             ft.Container(width=15, height=0),
             ft.Container(width=15, height=3, bgcolor=ft.Colors.BLUE),
-            ft.Text("期望输出", size=10, color=ft.Colors.BLUE),
+            ft.Text("Expected", size=10, color=ft.Colors.BLUE),
             ft.Container(width=15, height=0),
             ft.Container(width=15, height=3, bgcolor=ft.Colors.GREEN),
-            ft.Text("实际输出", size=10, color=ft.Colors.GREEN),
+            ft.Text("Actual", size=10, color=ft.Colors.GREEN),
         ], spacing=5)
         
-        # 返回完整的波形图
+        # Return complete waveform
         return ft.Container(
             content=ft.Column([
-                # 图例
+                # Legend
                 legend,
                 ft.Divider(height=1),
-                # 波形图主体
+                # Waveform main body
                 ft.Row([
-                    # 信号标签列 - 使用 Column 确保垂直对齐
+                    # Signal labels column - use Column for vertical alignment
                     ft.Column(
                         signal_labels, 
                         spacing=0, 
                         width=110,
                         height=total_height,
                     ),
-                    # 波形区域
+                    # Waveform area
                     ft.Column([
                         waveform_stack,
-                        # 时间刻度
+                        # Time labels
                         ft.Row(time_labels, spacing=0),
                     ], spacing=0),
                 ], spacing=0, vertical_alignment=ft.CrossAxisAlignment.START),
@@ -1126,7 +1177,7 @@ endmodule
     
     def _build_signal_waveform(self, data: list, min_time: int, time_scale: float, 
                                 value_key: str, color: str, y_base: int) -> list:
-        """构建单个信号的波形段"""
+        """Build waveform segment for single signal"""
         segments = []
         prev_x = 0
         prev_val = None
@@ -1135,7 +1186,7 @@ endmodule
             time = point['time']
             val = point.get(value_key, point.get('value', '0'))
             
-            # 计算x位置
+            # Calculate x position
             x = int((time - min_time) * time_scale)
             
             if i == 0:
@@ -1143,21 +1194,21 @@ endmodule
                 prev_val = val
                 continue
             
-            # 绘制从前一个点到当前点的线段
+            # Draw line segment from previous point to current point
             width = max(2, x - prev_x)
             
-            # 数值转电平 (0=低, 1=高, 2=未知)
+            # Convert value to logic level (0=low, 1=high, 2=unknown)
             val_num = self._parse_logic_value(prev_val)
             
-            # 波形高度位置 (高电平在上，低电平在下)
+            # Waveform height position (high level on top, low level on bottom)
             if val_num == 1:
-                y_offset = y_base  # 高电平
+                y_offset = y_base  # high level
             elif val_num == 0:
-                y_offset = y_base + 12  # 低电平
+                y_offset = y_base + 12  # low level
             else:
-                y_offset = y_base + 6  # 中间态
+                y_offset = y_base + 6  # intermediate state
             
-            # 创建水平波形段
+            # Create horizontal waveform segment
             segment = ft.Container(
                 width=width,
                 height=2 if val_num != 2 else 6,
@@ -1166,7 +1217,7 @@ endmodule
             )
             segments.append(segment)
             
-            # 添加垂直跳变线（如果值发生变化）
+            # Add vertical transition line (if value changes)
             if prev_val != val:
                 y1 = y_base if self._parse_logic_value(prev_val) == 1 else y_base + 12
                 y2 = y_base if self._parse_logic_value(val) == 1 else y_base + 12
@@ -1182,7 +1233,7 @@ endmodule
             prev_x = x
             prev_val = val
         
-        # 添加最后一个点
+        # Add last point
         if data:
             last_val = data[-1].get(value_key, data[-1].get('value', '0'))
             val_num = self._parse_logic_value(last_val)
@@ -1199,7 +1250,7 @@ endmodule
         return segments
     
     def _parse_logic_value(self, val: str) -> int:
-        """解析逻辑值为数字 (0=低, 1=高, 2=未知/其他)"""
+        """Parse logic value to number (0=low, 1=high, 2=unknown/other)"""
         if val in ['0', "1'b0", "1'h0"]:
             return 0
         elif val in ['1', "1'b1", "1'h1"]:
@@ -1207,7 +1258,7 @@ endmodule
         elif val in ['x', 'X', 'z', 'Z', '?']:
             return 2
         else:
-            # 尝试解析数字
+            # Try to parse number
             try:
                 if val.startswith("1'b"):
                     return int(val[3:])
@@ -1219,11 +1270,11 @@ endmodule
                 return 2
     
     def _extract_all_signals(self, output: str) -> list:
-        """从输出中提取所有信号名"""
+        """Extract all signal names from output"""
         signals = []
         for line in output.split('\n'):
             if 'time=' in line or 't=' in line:
-                # 匹配 name=value 对
+                # Match name=value pairs
                 for match in re.finditer(r'(\w+)=([\w\'b\d]+)', line):
                     sig = match.group(1)
                     if sig not in ['time', 't'] and sig not in signals:
@@ -1231,7 +1282,7 @@ endmodule
         return signals
     
     def _save_test_result(self, exec_result: ExecutionResult):
-        """保存测试结果（使用ID命名，按题目子文件夹组织）"""
+        """Save test results (using ID naming, organized by question subfolder)"""
         result_data = {
             "test_time": datetime.now().isoformat(),
             "question_id": self.question_id,
@@ -1242,7 +1293,7 @@ endmodule
             "vcd_file": exec_result.vcd_file,
         }
         
-        # 使用ID作为子目录
+        # Use ID as subdirectory
         question_dir = os.path.join(SUBMISSIONS_DIR, f"week{self.week}", self.question_id)
         os.makedirs(question_dir, exist_ok=True)
         
@@ -1252,39 +1303,39 @@ endmodule
             with open(result_file, 'w', encoding='utf-8') as f:
                 json.dump(result_data, f, ensure_ascii=False, indent=2)
         except Exception as e:
-            print(f"保存测试结果失败: {e}")
+            print(f"Failed to save test results: {e}")
     
     def _on_save_and_continue(self, e):
-        """保存并继续按钮点击"""
+        """Save and continue button click"""
         if self._save_code():
-            # 标记当前题目为已完成
+            # Mark current question as completed
             self._update_progress(status="completed")
             
             total = len(self.app.drawn_questions)
             
             if self.question_index + 1 < total:
-                # 还有下一题
+                # There is a next question
                 self.app.navigate_to_question(self.question_index + 1)
             else:
-                # 本周完成
+                # Week completed
                 self._mark_week_completed()
-                self.app.show_snackbar("本周作业已完成！请生成报告。", ft.Colors.GREEN)
+                self.app.show_snackbar("Week completed! Please generate report.", ft.Colors.GREEN)
                 self._show_report_dialog()
     
     def _on_prev_question(self, e):
-        """上一题按钮点击"""
+        """Previous question button click"""
         if self.question_index > 0:
             self.app.navigate_to_question(self.question_index - 1)
     
     def _mark_week_completed(self):
-        """标记本周已完成（遍历所有题目子文件夹）"""
+        """Mark week as completed (iterate through all question subfolders)"""
         week_dir = os.path.join(SUBMISSIONS_DIR, f"week{self.week}")
         
         if not os.path.exists(week_dir):
             return
             
         try:
-            # 遍历所有题目子文件夹
+            # Iterate through all question subfolders
             for qid in os.listdir(week_dir):
                 q_dir = os.path.join(week_dir, qid)
                 if not os.path.isdir(q_dir):
@@ -1303,37 +1354,37 @@ endmodule
                             with open(progress_file, 'w', encoding='utf-8') as f:
                                 json.dump(progress_data, f, ensure_ascii=False, indent=2)
                     except Exception as e:
-                        print(f"标记题目 {qid} 完成状态失败: {e}")
+                        print(f"Failed to mark question {qid} as completed: {e}")
         except Exception as e:
-            print(f"标记完成状态失败: {e}")
+            print(f"Failed to mark completion status: {e}")
     
     def _show_report_dialog(self):
-        """显示生成报告对话框"""
+        """Show generate report dialog"""
         from core.report_generator import report_generator
         
         def generate_report(e):
             dialog.open = False
             self.app.page.update()
             
-            # 生成报告
+            # Generate report
             report_path = report_generator.generate_week_report(self.week)
             
             if report_path:
-                self.app.show_snackbar(f"报告已生成: {report_path}", ft.Colors.GREEN)
+                self.app.show_snackbar(f"Report generated: {report_path}", ft.Colors.GREEN)
                 self._show_open_report_dialog(report_path)
             else:
-                self.app.show_snackbar("报告生成失败", ft.Colors.RED)
+                self.app.show_snackbar("Report generation failed", ft.Colors.RED)
         
         def close_dialog(e):
             dialog.open = False
             self.app.page.update()
         
         dialog = ft.AlertDialog(
-            title=ft.Text("生成报告"),
-            content=ft.Text("本周所有题目已完成，是否生成报告？"),
+            title=ft.Text("Generate Report"),
+            content=ft.Text("All questions for this week are completed. Generate report?"),
             actions=[
-                ft.TextButton("稍后", on_click=close_dialog),
-                ft.ElevatedButton("生成报告", on_click=generate_report),
+                ft.TextButton("Later", on_click=close_dialog),
+                ft.ElevatedButton("Generate", on_click=generate_report),
             ],
             actions_alignment=ft.MainAxisAlignment.END,
         )
@@ -1343,14 +1394,14 @@ endmodule
         self.app.page.update()
     
     def _show_open_report_dialog(self, report_path: str):
-        """显示打开报告对话框，关闭后返回题目选择界面"""
+        """Show open report dialog, return to question selection after close"""
         import subprocess
         import sys
         
         def open_folder(e):
             folder = os.path.dirname(report_path)
             try:
-                # 根据平台选择打开方式
+                # Choose open method based on platform
                 if sys.platform == 'win32':
                     subprocess.run(['explorer', folder])
                 elif sys.platform == 'darwin':
@@ -1358,11 +1409,11 @@ endmodule
                 else:
                     subprocess.run(['xdg-open', folder])
             except Exception as ex:
-                self.app.show_snackbar(f"无法打开文件夹: {ex}", ft.Colors.RED)
+                self.app.show_snackbar(f"Cannot open folder: {ex}", ft.Colors.RED)
             
             dialog.open = False
             self.app.page.update()
-            # 返回题目选择界面
+            # Return to question selection interface
             self.app.show_week_selector()
         
         def close(e):
@@ -1372,11 +1423,11 @@ endmodule
             self.app.show_week_selector()
         
         dialog = ft.AlertDialog(
-            title=ft.Text("报告已生成"),
-            content=ft.Text(f"报告路径:\n{report_path}"),
+            title=ft.Text("Report Generated"),
+            content=ft.Text(f"Report path:\n{report_path}"),
             actions=[
-                ft.TextButton("关闭", on_click=close),
-                ft.ElevatedButton("打开文件夹", on_click=open_folder),
+                ft.TextButton("Close", on_click=close),
+                ft.ElevatedButton("Open Folder", on_click=open_folder),
             ],
             actions_alignment=ft.MainAxisAlignment.END,
         )
