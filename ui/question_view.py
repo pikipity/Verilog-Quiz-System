@@ -469,6 +469,8 @@ class QuestionView:
     
     def _load_question_markdown(self) -> str:
         """Load question Markdown content (using ID as directory name)"""
+        import base64
+        
         if not self.question_id:
             return "# Failed to load question\n\nPlease return and reselect the week."
         
@@ -476,14 +478,63 @@ class QuestionView:
         md_file = os.path.join(
             QUESTIONS_DIR, 
             f"week{self.week}", 
-            self.question_id,  # 使用ID
+            self.question_id,
             "question.md"
         )
         
         if os.path.exists(md_file):
             try:
                 with open(md_file, 'r', encoding='utf-8') as f:
-                    return f.read()
+                    content = f.read()
+                
+                # Convert local images to base64 for embedded display
+                question_dir = os.path.dirname(md_file)
+                
+                def replace_image_with_base64(match):
+                    alt_text = match.group(1)
+                    img_path = match.group(2)
+                    
+                    # Skip if already a URL or data URI
+                    if img_path.startswith(('http://', 'https://', 'data:')):
+                        return match.group(0)
+                    
+                    # Get absolute path to image
+                    abs_img_path = os.path.join(question_dir, img_path)
+                    
+                    if os.path.exists(abs_img_path):
+                        try:
+                            # Read image and convert to base64
+                            with open(abs_img_path, 'rb') as img_file:
+                                img_data = img_file.read()
+                                base64_data = base64.b64encode(img_data).decode('utf-8')
+                            
+                            # Determine MIME type from extension
+                            ext = os.path.splitext(img_path)[1].lower()
+                            mime_types = {
+                                '.png': 'image/png',
+                                '.jpg': 'image/jpeg',
+                                '.jpeg': 'image/jpeg',
+                                '.gif': 'image/gif',
+                                '.svg': 'image/svg+xml',
+                                '.bmp': 'image/bmp',
+                                '.webp': 'image/webp'
+                            }
+                            mime_type = mime_types.get(ext, 'image/png')
+                            
+                            return f'![{alt_text}](data:{mime_type};base64,{base64_data})'
+                        except Exception as e:
+                            print(f"Failed to embed image {img_path}: {e}")
+                            return f'![{alt_text}]({img_path})'
+                    else:
+                        print(f"Image not found: {abs_img_path}")
+                        return f'![{alt_text}]({img_path})'
+                
+                content = re.sub(
+                    r'!\[([^\]]*)\]\(([^)]+)\)',
+                    replace_image_with_base64,
+                    content
+                )
+                return content
             except Exception as e:
                 return f"# Failed to read question\n\n{e}"
         
