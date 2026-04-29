@@ -39,29 +39,38 @@ jobs:
             build_cmd: macos
 
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 45    # flet build 下载 Flutter SDK 可能较久
 
     steps:
       # ========== 1. 检出代码 ==========
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # ========== 2. 设置 Python ==========
+      # ========== 2. 安装 Linux 系统依赖（仅 Linux）==========
+      - name: Install Linux dependencies
+        if: matrix.target == 'linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang cmake ninja-build pkg-config libblkid-dev liblzma-dev libgtk-3-dev libstdc++-12-dev
+
+      # ========== 3. 设置 Python ==========
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
-      # ========== 3. 安装依赖 ==========
+      # ========== 4. 安装 Python 依赖 ==========
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install flet flet-desktop cryptography requests
 
-      # ========== 4. 用 flet build 打包 ==========
+      # ========== 5. 用 flet build 打包 ==========
+      # flet build 会自动下载 Flutter SDK（~500MB），CI 无 TTY，用 yes 自动确认
       - name: Build with flet
-        run: flet build ${{ matrix.build_cmd }} --output dist
+        run: yes | flet build ${{ matrix.build_cmd }} --output dist
 
-      # ========== 5. 整理构建产物 ==========
+      # ========== 6. 整理构建产物 ==========
       - name: Prepare artifact
         shell: bash
         run: |
@@ -72,7 +81,7 @@ jobs:
             cp -r dist/${{ matrix.target }}/* release/
           fi
 
-      # ========== 6. 上传构建产物 ==========
+      # ========== 7. 上传构建产物 ==========
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
@@ -80,7 +89,7 @@ jobs:
           path: release/*
           retention-days: 30
 
-      # ========== 7. 创建 Release ==========
+      # ========== 8. 创建 Release ==========
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
