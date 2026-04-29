@@ -28,12 +28,15 @@ jobs:
           - os: windows-latest
             target: windows
             ext: .exe
+            build_cmd: windows
           - os: ubuntu-22.04
             target: linux
             ext: ''
+            build_cmd: linux
           - os: macos-latest
             target: macos
             ext: ''
+            build_cmd: macos
 
     runs-on: ${{ matrix.os }}
 
@@ -52,31 +55,32 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install pyinstaller flet cryptography requests
+          pip install flet flet-desktop cryptography requests
 
-      # ========== 4. 打包可执行文件 ==========
-      - name: Install flet-desktop
-        run: pip install flet-desktop
+      # ========== 4. 用 flet build 打包 ==========
+      - name: Build with flet
+        run: flet build ${{ matrix.build_cmd }} --output dist
 
-      - name: Build executable
-        run: >
-          pyinstaller --onefile --name verilog-quiz-${{ matrix.target }} --clean
-          --windowed --noconsole
-          --hidden-import=flet_desktop
-          --hidden-import=flet.utils.pip
-          --collect-all flet
-          --collect-all flet_desktop
-          main.py
+      # ========== 5. 整理构建产物 ==========
+      - name: Prepare artifact
+        shell: bash
+        run: |
+          mkdir -p release
+          if [ "${{ matrix.target }}" = "windows" ]; then
+            cp -r dist/${{ matrix.target }}/* release/
+          else
+            cp -r dist/${{ matrix.target }}/* release/
+          fi
 
-      # ========== 5. 上传构建产物 ==========
+      # ========== 6. 上传构建产物 ==========
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: verilog-quiz-${{ matrix.target }}
-          path: dist/*
+          path: release/*
           retention-days: 30
 
-      # ========== 6. 创建 Release ==========
+      # ========== 7. 创建 Release ==========
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
@@ -85,7 +89,7 @@ jobs:
           body: |
             ## Verilog Quiz System v1.0.${{ github.run_number }}
 
-            自动构建版本
+            自动构建版本（flet build，开箱即用）
 
             ### 构建信息
             - 提交: ${{ github.sha }}
@@ -94,15 +98,15 @@ jobs:
             - 构建时间: ${{ github.event.head_commit.timestamp }}
 
             ### 下载说明
-            - `verilog-quiz-windows.exe`: Windows 版本
+            - `verilog-quiz-windows.exe`: Windows 版本，下载后直接双击运行
             - `verilog-quiz-linux`: Linux (Ubuntu) 版本
             - `verilog-quiz-macos`: macOS 版本
 
-            ### 使用说明
-            1. 下载对应平台的可执行文件
-            2. Windows 直接双击运行
-            3. Linux/macOS 需要先赋予执行权限：`chmod +x verilog-quiz-linux`
-          files: dist/*
+            ### 系统要求
+            - **Windows**: Windows 10/11，需预装 iverilog 和 GTKWave
+            - **Linux**: Ubuntu 22.04+，需预装 iverilog 和 GTKWave
+            - **macOS**: macOS 15.0+，需预装 iverilog 和 GTKWave
+          files: release/*
           draft: false
           prerelease: false
         env:
