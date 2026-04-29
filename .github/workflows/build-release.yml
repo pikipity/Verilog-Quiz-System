@@ -83,35 +83,47 @@ jobs:
         if: matrix.target != 'windows'
         run: yes | flet build ${{ matrix.build_cmd }} --output dist
 
-      # ========== 6. 查看并整理构建产物 ==========
-      - name: List build output
-        shell: bash
-        run: |
-          echo "=== Contents of dist/ ==="
-          find dist -type f | head -30 || true
-          echo "=== Contents of build/ ==="
-          find build -type f 2>/dev/null | head -30 || true
-
+      # ========== 6. 整理构建产物：打包成 zip ==========
       - name: Prepare artifact
         shell: bash
         run: |
-          mkdir -p release
-          # flet build 输出可能在 dist/<platform>/ 或 build/<platform>/
-          if [ -d "dist/${{ matrix.target }}" ]; then
-            cp -r dist/${{ matrix.target }}/* release/
-          elif [ -d "build/${{ matrix.target }}" ]; then
-            cp -r build/${{ matrix.target }}/* release/
-          else
-            echo "Warning: neither dist/${{ matrix.target }} nor build/${{ matrix.target }} found"
-            cp -r dist/* release/ 2>/dev/null || cp -r build/* release/ 2>/dev/null || true
+          set -e
+          # 查找 flet build 实际输出目录
+          EXE_PATH=$(find dist build -type f \( -name "*.exe" -o -name "verilog_quiz" -o -name "verilog-quiz*" \) 2>/dev/null | head -1 || true)
+          if [ -n "$EXE_PATH" ]; then
+            PLATFORM_DIR=$(dirname "$EXE_PATH")
+            while [ "$(basename "$PLATFORM_DIR")" != "${{ matrix.target }}" ] && [ "$PLATFORM_DIR" != "." ] && [ "$PLATFORM_DIR" != "/" ]; do
+              PLATFORM_DIR=$(dirname "$PLATFORM_DIR")
+            done
           fi
+          if [ -z "$PLATFORM_DIR" ] || [ ! -d "$PLATFORM_DIR" ]; then
+            if [ -d "dist/${{ matrix.target }}" ]; then
+              PLATFORM_DIR="dist/${{ matrix.target }}"
+            elif [ -d "build/${{ matrix.target }}" ]; then
+              PLATFORM_DIR="build/${{ matrix.target }}"
+            elif [ -d "dist" ]; then
+              PLATFORM_DIR="dist"
+            else
+              PLATFORM_DIR="build"
+            fi
+          fi
+
+          # 打包成 zip
+          mkdir -p release
+          ZIP_NAME="verilog-quiz-${{ matrix.target }}.zip"
+          if [ "${{ matrix.target }}" = "windows" ]; then
+            powershell -Command "Compress-Archive -Path '$PLATFORM_DIR\*' -DestinationPath 'release\$ZIP_NAME' -Force"
+          else
+            (cd "$PLATFORM_DIR" && zip -r "../release/$ZIP_NAME" .)
+          fi
+          echo "Created: release/$ZIP_NAME"
 
       # ========== 7. 上传构建产物 ==========
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: verilog-quiz-${{ matrix.target }}
-          path: release/*
+          path: release/*.zip
           retention-days: 30
 
       # ========== 8. 创建 Release ==========
@@ -132,15 +144,25 @@ jobs:
             - 构建时间: ${{ github.event.head_commit.timestamp }}
 
             ### 下载说明
-            - `verilog-quiz-windows.exe`: Windows 版本，下载后直接双击运行
-            - `verilog-quiz-linux`: Linux (Ubuntu) 版本
-            - `verilog-quiz-macos`: macOS 版本
+            1. 下载对应平台的 **zip 文件**
+            2. 解压到任意目录
+            3. 运行解压后的程序：
+               - **Windows**: 双击 `verilog_quiz.exe`
+               - **Linux**: `./verilog_quiz`
+               - **macOS**: 双击应用图标或 `./verilog_quiz`
+
+            ### 下载文件
+            | 文件 | 平台 | 说明 |
+            |------|------|------|
+            | `verilog-quiz-windows.zip` | Windows 10/11 | 解压后双击 exe 运行 |
+            | `verilog-quiz-linux.zip` | Ubuntu 22.04+ | 解压后赋予执行权限并运行 |
+            | `verilog-quiz-macos.zip` | macOS 15.0+ | 解压后运行 |
 
             ### 系统要求
             - **Windows**: Windows 10/11，需预装 iverilog 和 GTKWave
             - **Linux**: Ubuntu 22.04+，需预装 iverilog 和 GTKWave
             - **macOS**: macOS 15.0+，需预装 iverilog 和 GTKWave
-          files: release/*
+          files: release/*.zip
           draft: false
           prerelease: false
         env:
