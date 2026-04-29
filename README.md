@@ -8,61 +8,90 @@
 - **随机抽题**：每台机器固定随机种子，确保抽题结果一致
 - **代码编辑**：内置代码编辑器，支持自动保存
 - **仿真测试**：调用 iverilog 进行仿真，自动对比结果
-- **波形显示**：可视化显示仿真波形，直观对比期望与实际输出
+- **波形显示**：可视化波形查看，支持 GTKWave 专业波形分析
 - **报告生成**：自动生成 Markdown 格式报告，包含代码和测试结果
 - **加密保护**：参考答案加密存储，防止作弊
 
 ## 系统要求
 
-### 必须预装软件
+本程序运行需要以下依赖：
 
-本程序需要 **Icarus Verilog** 作为仿真后端，请根据你的操作系统安装：
+| 依赖 | 用途 | 必须 |
+|------|------|------|
+| **Icarus Verilog** | Verilog 代码编译和仿真 | 是 |
+| **GTKWave** | 波形查看和分析 | 是 |
+| **Python 3.8+** | 运行本程序 | 是 |
 
-#### Windows
+请根据你的操作系统，依次安装 **Icarus Verilog** 和 **GTKWave**：
 
-**方案 A：原生安装（推荐）**
+### Windows
+
+**Icarus Verilog（二选一）**
+
+方案 A - 原生安装（推荐）：
 1. 访问下载页面：https://bleyer.org/icarus/
 2. 下载最新版本（如 `iverilog-v12-2024-12-16-x64.msi`）
 3. 运行安装程序，按提示完成安装
 4. 将安装目录（如 `C:\iverilog\bin`）添加到系统 PATH
-5. 验证安装：打开命令提示符，输入 `iverilog -v`
+5. 验证：`iverilog -v`
 
-**方案 B：WSL（Windows Subsystem for Linux）**
+方案 B - WSL：
 ```powershell
-# 安装 WSL（如果尚未安装）
 wsl --install
-
-# 在 WSL 中安装 iverilog
 wsl sudo apt-get update
 wsl sudo apt-get install -y iverilog
 ```
 
-#### macOS
+**GTKWave**
 
+1. 访问下载页面：https://gtkwave.sourceforge.net/
+2. 下载 Windows 版本并安装到 `C:\Program Files\GTKWave`
+3. 验证：`"C:\Program Files\GTKWave\bin\gtkwave.exe" --version`
+
+WSL 用户也可在 WSL 中安装：
 ```bash
-# 使用 Homebrew 安装
-brew install icarus-verilog
+wsl sudo apt-get install -y gtkwave
+```
 
-# 验证安装
+### macOS
+
+**Icarus Verilog**
+```bash
+brew install icarus-verilog
 iverilog -v
 ```
 
-#### Linux（Ubuntu/Debian）
+**GTKWave**
+```bash
+brew install gtkwave
+gtkwave --version
+```
+
+### Linux
+
+#### Ubuntu / Debian
 
 ```bash
 sudo apt-get update
-sudo apt-get install -y iverilog
+sudo apt-get install -y iverilog gtkwave
 
-# 验证安装
+# 验证
 iverilog -v
+gtkwave --version
 ```
 
-#### Linux（CentOS/RHEL/Fedora）
+#### CentOS / RHEL / Fedora
 
 ```bash
-sudo yum install -y iverilog
-# 或
-sudo dnf install -y iverilog
+# Fedora
+sudo dnf install -y iverilog gtkwave
+
+# CentOS / RHEL
+sudo yum install -y iverilog gtkwave
+
+# 验证
+iverilog -v
+gtkwave --version
 ```
 
 ### Python 环境
@@ -151,7 +180,7 @@ chmod +x verilog-quiz-linux
 2. **编写代码**：在代码编辑器中编写 Verilog 代码（自动保存）
 3. **查看测试平台**：了解测试用例和期望输出
 4. **运行测试**：点击 **"运行测试"**，系统自动编译并对比结果
-5. **查看波形**：测试完成后显示波形图，直观对比输入输出
+5. **查看波形**：测试完成后在 GTKWave 中查看波形，对比输入输出
 6. **保存继续**：点击 **"保存并继续"** 进入下一题
 
 ### 数据存储位置
@@ -227,6 +256,7 @@ server {
 - **加密**: cryptography (XOR + Base64)
 - **网络**: requests
 - **仿真**: Icarus Verilog
+- **波形查看**: GTKWave
 - **打包**: PyInstaller
 
 ## 开发构建
@@ -265,6 +295,14 @@ pyinstaller --onefile --name verilog-quiz-macos main.py
 2. 确认 iverilog 在系统 PATH 中
 3. Windows 用户可尝试 WSL 模式（程序会自动检测）
 
+### Q: 提示"GTKWave not found" 或无法打开波形
+
+**A:**
+1. 确认 GTKWave 已正确安装（必须组件）
+2. Windows 用户：确保安装在 `C:\Program Files\GTKWave\bin\gtkwave.exe`
+3. 程序启动时会自动检测 GTKWave，可在控制台查看检测结果
+4. 如未安装，请参考上文安装说明进行安装
+
 ### Q: 无法连接到服务器
 
 **A:**
@@ -287,7 +325,7 @@ chmod +x verilog-quiz-linux
 
 本项目采用 MIT 许可证，详见 [LICENSE](LICENSE) 文件。
 
-**注意**: 本项目使用 Icarus Verilog 作为外部依赖，Icarus Verilog 采用 GPL 许可证。
+**注意**: 本项目使用 Icarus Verilog 和 GTKWave 作为外部依赖，两者均采用 GPL 许可证。
 
 ## 贡献
 

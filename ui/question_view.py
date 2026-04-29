@@ -4,6 +4,8 @@
 import os
 import json
 import re
+import sys
+import subprocess
 import time
 from datetime import datetime
 import flet as ft
@@ -826,10 +828,12 @@ endmodule
                 # 7. Execute reference code test
                 update_message("Running reference simulation...")
                 ref_result = code_executor.execute([ref_file, ref_tb_path], temp_dir, "ref.vvp")
+                print(f"[DEBUG] Reference result: compile={ref_result.compile_success}, run={ref_result.run_success}, vcd={ref_result.vcd_file}")
                 
                 # 8. Execute student code test
                 update_message("Running student code simulation...")
                 student_result = code_executor.execute([student_file, student_tb_path], temp_dir, "student.vvp")
+                print(f"[DEBUG] Student result: compile={student_result.compile_success}, run={student_result.run_success}, vcd={student_result.vcd_file}")
                 
                 # 8. Save results
                 update_message("Saving test results...")
@@ -997,31 +1001,160 @@ endmodule
             dialog.open = False
             self.app.page.update()
         
+        def extract_signals_from_vcd(vcd_file: str) -> list:
+            """Extract all signal names from VCD file"""
+            signals = []
+            try:
+                with open(vcd_file, 'r', encoding='utf-8', errors='ignore') as f:
+                    content = f.read()
+                    
+                # Parse $var sections: $var wire 1 ! a $end
+                # Format: $var <type> <size> <identifier> <name> $end
+                var_pattern = r'\$var\s+\w+\s+\d+\s+(\S+)\s+(\S+)\s*\$end'
+                for match in re.finditer(var_pattern, content):
+                    identifier = match.group(1)
+                    name = match.group(2)
+                    if name and name not in signals:
+                        signals.append(name)
+                
+                # Also try to extract scope information for full hierarchical names
+                scope_stack = []
+                hierarchical_signals = []
+                lines = content.split('\n')
+                i = 0
+                while i < len(lines):
+                    line = lines[i].strip()
+                    if line.startswith('$scope'):
+                        parts = line.split()
+                        if len(parts) >= 3:
+                            scope_stack.append(parts[2])
+                    elif line.startswith('$upscope'):
+                        if scope_stack:
+                            scope_stack.pop()
+                    elif line.startswith('$var'):
+                        parts = line.split()
+                        if len(parts) >= 5:
+                            name = parts[4]
+                            if scope_stack:
+                                full_name = '.'.join(scope_stack) + '.' + name
+                            else:
+                                full_name = name
+                            if full_name not in hierarchical_signals:
+                                hierarchical_signals.append(full_name)
+                    i += 1
+                
+                # Return hierarchical signals if found, otherwise simple signals
+                return hierarchical_signals if hierarchical_signals else signals
+            except Exception as e:
+                print(f"Error extracting signals from VCD: {e}")
+                return []
+        
+        def create_gtkwave_tcl_script(vcd_file: str, script_path: str) -> bool:
+            """Create a Tcl script to add all signals and zoom to fit"""
+            signals = extract_signals_from_vcd(vcd_file)
+            if not signals:
+                return False
+            
+            try:
+                with open(script_path, 'w', encoding='utf-8') as f:
+                    f.write("# GTKWave Tcl script - auto-generated\n")
+                    f.write("# Add all signals\n")
+                    
+                    # Add each signal individually (more reliable)
+                    for sig in signals:
+                        # Escape special characters in signal names
+                        escaped_sig = sig.replace('[', '\\[').replace(']', '\\]')
+                        f.write(f'gtkwave::addSignalsFromList "{escaped_sig}"\n')
+                    
+                    f.write("\n# Zoom to fit\n")
+                    f.write("gtkwave::/Time/Zoom/Zoom_Full\n")
+                    
+                return True
+            except Exception as e:
+                print(f"Error creating Tcl script: {e}")
+                return False
+        
+        def _check_gtkwave_in_wsl():
+            """Check if GTKWave is installed in WSL"""
+            try:
+                result = subprocess.run(
+                    ['wsl', 'which', 'gtkwave'],
+                    capture_output=True,
+                    timeout=5
+                )
+                return result.returncode == 0
+            except Exception as e:
+                print(f"WSL check error: {e}")
+                return False
+        
+        def _launch_gtkwave_windows_native(gtkwave_path: str, vcd: str, script: str = None):
+            """Launch native Windows GTKWave"""
+            if script and os.path.exists(script):
+                return subprocess.Popen([gtkwave_path, '-S', script, vcd], 
+                                       stdout=subprocess.DEVNULL, 
+                                       stderr=subprocess.DEVNULL)
+            else:
+                return subprocess.Popen([gtkwave_path, vcd], 
+                                       stdout=subprocess.DEVNULL, 
+                                       stderr=subprocess.DEVNULL)
+        
+        def _launch_gtkwave_wsl(vcd: str, script: str = None):
+            """Launch WSL GTKWave with Windows path conversion"""
+            # Convert Windows paths to WSL paths
+            # e.g., C:\Users\name\file.vcd -> /mnt/c/Users/name/file.vcd
+            drive = vcd[0].lower()
+            path_part = vcd[2:].replace('\\', '/')
+            wsl_vcd = f"/mnt/{drive}{path_part}"
+            
+            wsl_script = None
+            if script and os.path.exists(script):
+                script_drive = script[0].lower()
+                script_path_part = script[2:].replace('\\', '/')
+                wsl_script = f"/mnt/{script_drive}{script_path_part}"
+            
+            if wsl_script:
+                return subprocess.Popen(
+                    ['wsl', 'DISPLAY=:0', 'gtkwave', '-S', wsl_script, wsl_vcd],
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                    creationflags=subprocess.CREATE_NEW_PROCESS_GROUP
+                )
+            else:
+                return subprocess.Popen(
+                    ['wsl', 'DISPLAY=:0', 'gtkwave', wsl_vcd],
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                    creationflags=subprocess.CREATE_NEW_PROCESS_GROUP
+                )
+        
         def open_vcd_in_gtkwave(vcd_file: str, label: str):
-            """Open specific VCD file in GTKWave"""
-            if not vcd_file or not os.path.exists(vcd_file):
-                self.app.show_snackbar(f"{label} VCD file not found", ft.Colors.RED)
+            """Open specific VCD file in GTKWave with all signals displayed (Cross-platform)"""
+            print(f"[GTKWave] Opening {label} VCD: {vcd_file}")
+            
+            if not vcd_file:
+                self.app.show_snackbar(f"{label} VCD file path is empty", ft.Colors.RED)
+                return
+                
+            if not os.path.exists(vcd_file):
+                self.app.show_snackbar(f"{label} VCD file not found: {os.path.basename(vcd_file)}", ft.Colors.RED)
                 return
             
             try:
-                import subprocess
-                import sys
+                # Create Tcl script to add all signals (for all platforms)
+                temp_dir = os.path.dirname(vcd_file)
+                safe_label = label.lower().replace(' ', '_').replace('(', '').replace(')', '').replace('-', '_')
+                tcl_script = os.path.join(temp_dir, f"gtkwave_{safe_label}_signals.tcl")
+                has_script = create_gtkwave_tcl_script(vcd_file, tcl_script)
                 
-                def _check_gtkwave_in_wsl():
-                    """Check if GTKWave is installed in WSL"""
-                    try:
-                        result = subprocess.run(
-                            ['wsl', 'which', 'gtkwave'],
-                            capture_output=True,
-                            timeout=5
-                        )
-                        return result.returncode == 0
-                    except Exception as e:
-                        print(f"WSL check error: {e}")
-                        return False
+                print(f"Opening VCD: {vcd_file}")
+                print(f"VCD exists: {os.path.exists(vcd_file)}")
+                print(f"Tcl script: {tcl_script}")
+                print(f"Tcl exists: {os.path.exists(tcl_script) if has_script else 'N/A (no signals)'}")
                 
-                # Check platform and open GTKWave
-                if sys.platform == 'win32':
+                # Determine platform and launch GTKWave accordingly
+                platform = sys.platform
+                
+                if platform == 'win32':
                     # Windows: Try native first, then WSL
                     gtkwave_found = False
                     error_msg = ""
@@ -1034,9 +1167,10 @@ endmodule
                     for path in gtkwave_paths:
                         if os.path.exists(path):
                             try:
-                                subprocess.Popen([path, vcd_file], 
-                                               stdout=subprocess.DEVNULL, 
-                                               stderr=subprocess.DEVNULL)
+                                _launch_gtkwave_windows_native(
+                                    path, vcd_file, 
+                                    tcl_script if has_script else None
+                                )
                                 gtkwave_found = True
                                 print(f"Opened native GTKWave: {path}")
                                 break
@@ -1047,24 +1181,13 @@ endmodule
                     # 2. Try WSL GTKWave
                     if not gtkwave_found and _check_gtkwave_in_wsl():
                         try:
-                            # Convert Windows path to WSL path
-                            drive = vcd_file[0].lower()
-                            path_part = vcd_file[2:].replace('\\', '/')
-                            wsl_vcd = f"/mnt/{drive}{path_part}"
-                            
-                            print(f"Opening WSL GTKWave with VCD: {wsl_vcd}")
-                            
-                            # Simple reliable method: direct call with DISPLAY
-                            subprocess.Popen(
-                                ['wsl', 'DISPLAY=:0', 'gtkwave', wsl_vcd],
-                                stdout=subprocess.DEVNULL,
-                                stderr=subprocess.DEVNULL,
-                                creationflags=subprocess.CREATE_NEW_PROCESS_GROUP
+                            print(f"Opening WSL GTKWave with VCD: {vcd_file}")
+                            _launch_gtkwave_wsl(
+                                vcd_file, 
+                                tcl_script if has_script else None
                             )
-                            
                             gtkwave_found = True
                             print("Launched WSL GTKWave")
-                                
                         except Exception as e:
                             error_msg = f"WSL GTKWave error: {e}"
                             print(error_msg)
@@ -1073,18 +1196,83 @@ endmodule
                         self.app.show_snackbar(f"Opening {label} in GTKWave...", ft.Colors.GREEN)
                     else:
                         full_msg = "GTKWave not found or failed to open.\n\n"
-                        full_msg += "For WSL users:\n"
-                        full_msg += "1. Install GTKWave: sudo apt install gtkwave\n"
-                        full_msg += "2. For WSL1: Install VcXsrv on Windows\n"
-                        full_msg += "3. For WSL2 on Win11: GUI should work natively\n\n"
+                        full_msg += "Installation options:\n"
+                        full_msg += "1. Windows: Install from http://gtkwave.sourceforge.net/\n"
+                        full_msg += "2. WSL: sudo apt install gtkwave\n\n"
                         full_msg += f"Error: {error_msg[:100]}"
                         self.app.show_snackbar(full_msg, ft.Colors.RED, duration=8000)
+                
+                elif platform == 'darwin':
+                    # macOS: Try 'open -a GTKWave' first, then direct 'gtkwave'
+                    try:
+                        # Method 1: Try open -a GTKWave (opens app bundle)
+                        cmd = ['open', '-a', 'GTKWave', vcd_file]
+                        if has_script and os.path.exists(tcl_script):
+                            # Note: macOS GTKWave may not support -S via open -a
+                            # Try direct gtkwave command with script
+                            try:
+                                subprocess.Popen(
+                                    ['gtkwave', '-S', tcl_script, vcd_file],
+                                    stdout=subprocess.DEVNULL,
+                                    stderr=subprocess.DEVNULL
+                                )
+                                print("Launched macOS GTKWave with script")
+                            except:
+                                subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                                print("Launched macOS GTKWave via open -a")
+                        else:
+                            subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                            print("Launched macOS GTKWave via open -a")
+                        
+                        self.app.show_snackbar(f"Opening {label} in GTKWave...", ft.Colors.GREEN)
+                    except Exception as e:
+                        # Method 2: Try direct gtkwave command
+                        try:
+                            if has_script and os.path.exists(tcl_script):
+                                subprocess.Popen(
+                                    ['gtkwave', '-S', tcl_script, vcd_file],
+                                    stdout=subprocess.DEVNULL,
+                                    stderr=subprocess.DEVNULL
+                                )
+                            else:
+                                subprocess.Popen(
+                                    ['gtkwave', vcd_file],
+                                    stdout=subprocess.DEVNULL,
+                                    stderr=subprocess.DEVNULL
+                                )
+                            self.app.show_snackbar(f"Opening {label} in GTKWave...", ft.Colors.GREEN)
+                        except Exception as e2:
+                            self.app.show_snackbar(
+                                f"GTKWave not found. Install with: brew install gtkwave", 
+                                ft.Colors.RED, 
+                                duration=5000
+                            )
+                
                 else:
-                    # Linux/macOS: Direct call
-                    subprocess.Popen(['gtkwave', vcd_file], 
-                                   stdout=subprocess.DEVNULL, 
-                                   stderr=subprocess.DEVNULL)
-                    self.app.show_snackbar(f"Opening {label} in GTKWave...", ft.Colors.GREEN)
+                    # Linux and other Unix-like systems
+                    try:
+                        if has_script and os.path.exists(tcl_script):
+                            subprocess.Popen(
+                                ['gtkwave', '-S', tcl_script, vcd_file],
+                                stdout=subprocess.DEVNULL,
+                                stderr=subprocess.DEVNULL
+                            )
+                            print(f"Launched Linux GTKWave with script: {tcl_script}")
+                        else:
+                            subprocess.Popen(
+                                ['gtkwave', vcd_file],
+                                stdout=subprocess.DEVNULL,
+                                stderr=subprocess.DEVNULL
+                            )
+                            print("Launched Linux GTKWave without script")
+                        
+                        self.app.show_snackbar(f"Opening {label} in GTKWave...", ft.Colors.GREEN)
+                    except Exception as e:
+                        self.app.show_snackbar(
+                            f"GTKWave not found. Install with: sudo apt install gtkwave", 
+                            ft.Colors.RED, 
+                            duration=5000
+                        )
                     
             except Exception as ex:
                 self.app.show_snackbar(f"Failed to open GTKWave: {ex}", ft.Colors.RED)
@@ -1105,33 +1293,34 @@ endmodule
         # Build action buttons
         actions = [ft.TextButton("Close", on_click=close_dialog)]
         
-        # Add GTKWave buttons for both VCD files (only if simulation succeeded)
+        # Add GTKWave buttons for both VCD files (show if VCD exists)
         gtkwave_buttons = []
         
-        if student_result.compile_success and student_result.run_success:
-            # Reference/Expected VCD button - show first (green for correct/expected)
-            if ref_result.vcd_file and os.path.exists(ref_result.vcd_file):
-                gtkwave_buttons.append(ft.ElevatedButton(
-                    "View Expected Waveform",
-                    icon=ft.Icons.CHECK_CIRCLE,
-                    on_click=open_ref_vcd,
-                    tooltip="Open reference (expected) waveform in GTKWave",
-                    style=ft.ButtonStyle(
-                        color=ft.Colors.WHITE,
-                        bgcolor=ft.Colors.GREEN,
-                    ),
-                ))
-            
-            # Student VCD button - show second (blue for student)
-            if student_result.vcd_file and os.path.exists(student_result.vcd_file):
-                gtkwave_buttons.append(ft.ElevatedButton(
-                    "View Your Waveform",
-                    icon=ft.Icons.PERSON,
-                    on_click=open_student_vcd,
-                    tooltip="Open your waveform in GTKWave",
-                    style=ft.ButtonStyle(
-                        color=ft.Colors.WHITE,
-                        bgcolor=ft.Colors.BLUE,
+        # Reference/Expected VCD button - show first (green for correct/expected)
+        print(f"Ref VCD: {ref_result.vcd_file}, exists: {os.path.exists(ref_result.vcd_file) if ref_result.vcd_file else False}")
+        if ref_result.vcd_file and os.path.exists(ref_result.vcd_file):
+            gtkwave_buttons.append(ft.ElevatedButton(
+                "View Expected Waveform",
+                icon=ft.Icons.CHECK_CIRCLE,
+                on_click=open_ref_vcd,
+                tooltip="Open reference (expected) waveform in GTKWave",
+                style=ft.ButtonStyle(
+                    color=ft.Colors.WHITE,
+                    bgcolor=ft.Colors.GREEN,
+                ),
+            ))
+        
+        # Student VCD button - show second (blue for student)
+        print(f"Student VCD: {student_result.vcd_file}, exists: {os.path.exists(student_result.vcd_file) if student_result.vcd_file else False}")
+        if student_result.vcd_file and os.path.exists(student_result.vcd_file):
+            gtkwave_buttons.append(ft.ElevatedButton(
+                "View Your Waveform",
+                icon=ft.Icons.PERSON,
+                on_click=open_student_vcd,
+                tooltip="Open your waveform in GTKWave",
+                style=ft.ButtonStyle(
+                    color=ft.Colors.WHITE,
+                    bgcolor=ft.Colors.BLUE,
                     ),
                 ))
         
