@@ -108,16 +108,8 @@ jobs:
 
           # 用 Python 创建 zip（跨平台一致，避免 shell 路径问题）
           mkdir -p release
-          ZIP_NAME="verilog-quiz-${{ matrix.target }}.zip"
-          python -c "
-import shutil, os
-shutil.make_archive(
-    os.path.join('release', 'verilog-quiz-${{ matrix.target }}'),
-    'zip',
-    '$PLATFORM_DIR'
-)
-print('Created:', os.path.join('release', '$ZIP_NAME'))
-"
+          python -c "import shutil; shutil.make_archive('release/verilog-quiz-${{ matrix.target }}', 'zip', '$PLATFORM_DIR')"
+          echo "Created: release/verilog-quiz-${{ matrix.target }}.zip"
           ls -lh release/
 
       # ========== 7. 上传构建产物 ==========
