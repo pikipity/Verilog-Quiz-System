@@ -40,6 +40,9 @@ jobs:
 
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45    # flet build 下载 Flutter SDK 可能较久
+    env:
+      PYTHONIOENCODING: utf-8
+      PYTHONLEGACYWINDOWSSTDIO: utf-8
 
     steps:
       # ========== 1. 检出代码 ==========
@@ -66,8 +69,18 @@ jobs:
           pip install flet flet-desktop cryptography requests
 
       # ========== 5. 用 flet build 打包 ==========
-      # flet build 会自动下载 Flutter SDK（~500MB），CI 无 TTY，用 yes 自动确认
-      - name: Build with flet
+      # flet build 会自动下载 Flutter SDK（~500MB）
+      # CI 无 TTY，分平台用不同方式自动确认安装
+
+      - name: Build with flet (Windows)
+        if: matrix.target == 'windows'
+        shell: cmd
+        run: |
+          chcp 65001 >nul
+          echo y | flet build windows --output dist
+
+      - name: Build with flet (Linux/macOS)
+        if: matrix.target != 'windows'
         run: yes | flet build ${{ matrix.build_cmd }} --output dist
 
       # ========== 6. 整理构建产物 ==========
