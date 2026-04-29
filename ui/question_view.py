@@ -4,6 +4,7 @@
 import os
 import json
 import re
+import time
 from datetime import datetime
 import flet as ft
 from config import (
@@ -798,13 +799,37 @@ endmodule
                 with open(ref_file, 'w', encoding='utf-8') as f:
                     f.write(ref_code)
                 
-                # 6. Execute reference code test
-                update_message("Running reference simulation...")
-                ref_result = code_executor.execute([ref_file, tb_path], temp_dir, "ref.vvp")
+                # 6. Create separate testbenches with different VCD filenames
+                # Modify testbench to use different dumpfile names
+                import re
                 
-                # 7. Execute student code test
+                # Create reference testbench with ref_wave.vcd
+                ref_testbench = re.sub(
+                    r'\$dumpfile\s*\(\s*"([^"]+)"\s*\)',
+                    r'$dumpfile("ref_wave.vcd")',
+                    testbench
+                )
+                ref_tb_path = os.path.join(temp_dir, "ref_testbench.v")
+                with open(ref_tb_path, 'w', encoding='utf-8') as f:
+                    f.write(ref_testbench)
+                
+                # Create student testbench with student_wave.vcd
+                student_testbench = re.sub(
+                    r'\$dumpfile\s*\(\s*"([^"]+)"\s*\)',
+                    r'$dumpfile("student_wave.vcd")',
+                    testbench
+                )
+                student_tb_path = os.path.join(temp_dir, "student_testbench.v")
+                with open(student_tb_path, 'w', encoding='utf-8') as f:
+                    f.write(student_testbench)
+                
+                # 7. Execute reference code test
+                update_message("Running reference simulation...")
+                ref_result = code_executor.execute([ref_file, ref_tb_path], temp_dir, "ref.vvp")
+                
+                # 8. Execute student code test
                 update_message("Running student code simulation...")
-                student_result = code_executor.execute([student_file, tb_path], temp_dir, "student.vvp")
+                student_result = code_executor.execute([student_file, student_tb_path], temp_dir, "student.vvp")
                 
                 # 8. Save results
                 update_message("Saving test results...")
@@ -895,69 +920,236 @@ endmodule
         return input_signals, output_signals
     
     def _show_test_result_dialog(self, student_result: ExecutionResult, ref_result: ExecutionResult, testbench: str):
-        """Show test result dialog (display waveform)"""
-        # Extract all signals
-        all_signals = self._extract_all_signals(ref_result.output or student_result.output)
-        # Extract input and output signals from testbench
-        input_signals, output_signals = self._extract_input_output_signals(testbench)
+        """Show test result dialog with simplified status message and GTKWave buttons"""
         
-        # Use result_analyzer to analyze results
-        if ref_result.output and student_result.output:
-            analysis = result_analyzer.analyze_from_display(
-                ref_result.output,
-                student_result.output,
-                output_signals
-            )
-        else:
-            analysis = None
-        
-        # Build dialog content
-        content_controls = []
-        
-        # Compilation status
+        # Determine test status
         if not student_result.compile_success:
-            content_controls.extend([
-                ft.Text("Compilation Failed", size=18, color=ft.Colors.RED, weight=ft.FontWeight.BOLD),
-                ft.Text(student_result.error or "Unknown error", selectable=True),
-            ])
+            status_icon = ft.Icons.ERROR
+            status_color = ft.Colors.RED
+            status_text = "Compilation Failed"
+            status_subtitle = "Please check your code for syntax errors."
+        elif not student_result.run_success:
+            status_icon = ft.Icons.WARNING
+            status_color = ft.Colors.ORANGE
+            status_text = "Simulation Failed"
+            status_subtitle = "The simulation encountered an error during execution."
         else:
-            if analysis and analysis.success and analysis.comparisons:
-                # Organize waveform data by signal
-                signal_data = self._organize_waveform_data(analysis.comparisons, all_signals, input_signals, output_signals)
-                
-                # Draw complete waveform (all signals together)
-                waveform_container = self._build_combined_waveform(
-                    signal_data, input_signals, output_signals
+            status_icon = ft.Icons.CHECK_CIRCLE
+            status_color = ft.Colors.GREEN
+            status_text = "Simulation Successful"
+            status_subtitle = "Your code compiled and ran successfully. Click a button below to view waveforms."
+        
+        # Build dialog content - simplified status display
+        content_controls = [
+            ft.Row(
+                [
+                    ft.Icon(status_icon, color=status_color, size=48),
+                    ft.Column(
+                        [
+                            ft.Text(status_text, size=20, weight=ft.FontWeight.BOLD, color=status_color),
+                            ft.Text(status_subtitle, size=12, color=ft.Colors.GREY_600),
+                        ],
+                        spacing=5,
+                    ),
+                ],
+                spacing=15,
+                alignment=ft.MainAxisAlignment.CENTER,
+            ),
+            ft.Divider(height=20),
+        ]
+        
+        # Show error details if compilation/simulation failed
+        if not student_result.compile_success:
+            content_controls.append(
+                ft.Container(
+                    content=ft.Column(
+                        [
+                            ft.Text("Error Details:", weight=ft.FontWeight.BOLD, size=12),
+                            ft.Text(student_result.error or "Unknown error", selectable=True, size=11),
+                        ],
+                        scroll=ft.ScrollMode.AUTO,
+                    ),
+                    padding=10,
+                    bgcolor=ft.Colors.RED_50,
+                    border_radius=8,
+                    height=200,
                 )
-                content_controls.append(waveform_container)
-            else:
-                # Display raw output
-                content_controls.extend([
-                    ft.Text("Reference Output:", weight=ft.FontWeight.BOLD),
-                    ft.Text(ref_result.output or "(no output)", selectable=True, size=12),
-                    ft.Divider(),
-                    ft.Text("Student Output:", weight=ft.FontWeight.BOLD),
-                    ft.Text(student_result.output or "(no output)", selectable=True, size=12),
-                ])
-                if student_result.error:
-                    content_controls.extend([
-                        ft.Text("Error Message:", weight=ft.FontWeight.BOLD, color=ft.Colors.RED),
-                        ft.Text(student_result.error, selectable=True, color=ft.Colors.RED),
-                    ])
+            )
+        elif not student_result.run_success:
+            content_controls.append(
+                ft.Container(
+                    content=ft.Column(
+                        [
+                            ft.Text("Error Details:", weight=ft.FontWeight.BOLD, size=12),
+                            ft.Text(student_result.error or "Simulation error", selectable=True, size=11),
+                        ],
+                        scroll=ft.ScrollMode.AUTO,
+                    ),
+                    padding=10,
+                    bgcolor=ft.Colors.ORANGE_50,
+                    border_radius=8,
+                    height=150,
+                )
+            )
         
         # Create dialog
         def close_dialog(e):
             dialog.open = False
             self.app.page.update()
         
-        content = ft.Column(content_controls, scroll=ft.ScrollMode.AUTO, height=500, width=750)
+        def open_vcd_in_gtkwave(vcd_file: str, label: str):
+            """Open specific VCD file in GTKWave"""
+            if not vcd_file or not os.path.exists(vcd_file):
+                self.app.show_snackbar(f"{label} VCD file not found", ft.Colors.RED)
+                return
+            
+            try:
+                import subprocess
+                import sys
+                
+                def _check_gtkwave_in_wsl():
+                    """Check if GTKWave is installed in WSL"""
+                    try:
+                        result = subprocess.run(
+                            ['wsl', 'which', 'gtkwave'],
+                            capture_output=True,
+                            timeout=5
+                        )
+                        return result.returncode == 0
+                    except Exception as e:
+                        print(f"WSL check error: {e}")
+                        return False
+                
+                # Check platform and open GTKWave
+                if sys.platform == 'win32':
+                    # Windows: Try native first, then WSL
+                    gtkwave_found = False
+                    error_msg = ""
+                    
+                    # 1. Try native GTKWave.exe
+                    gtkwave_paths = [
+                        r"C:\Program Files\GTKWave\bin\gtkwave.exe",
+                        r"C:\Program Files (x86)\GTKWave\bin\gtkwave.exe",
+                    ]
+                    for path in gtkwave_paths:
+                        if os.path.exists(path):
+                            try:
+                                subprocess.Popen([path, vcd_file], 
+                                               stdout=subprocess.DEVNULL, 
+                                               stderr=subprocess.DEVNULL)
+                                gtkwave_found = True
+                                print(f"Opened native GTKWave: {path}")
+                                break
+                            except Exception as e:
+                                error_msg = f"Native GTKWave error: {e}"
+                                print(error_msg)
+                    
+                    # 2. Try WSL GTKWave
+                    if not gtkwave_found and _check_gtkwave_in_wsl():
+                        try:
+                            # Convert Windows path to WSL path
+                            drive = vcd_file[0].lower()
+                            path_part = vcd_file[2:].replace('\\', '/')
+                            wsl_vcd = f"/mnt/{drive}{path_part}"
+                            
+                            print(f"Opening WSL GTKWave with VCD: {wsl_vcd}")
+                            
+                            # Simple reliable method: direct call with DISPLAY
+                            subprocess.Popen(
+                                ['wsl', 'DISPLAY=:0', 'gtkwave', wsl_vcd],
+                                stdout=subprocess.DEVNULL,
+                                stderr=subprocess.DEVNULL,
+                                creationflags=subprocess.CREATE_NEW_PROCESS_GROUP
+                            )
+                            
+                            gtkwave_found = True
+                            print("Launched WSL GTKWave")
+                                
+                        except Exception as e:
+                            error_msg = f"WSL GTKWave error: {e}"
+                            print(error_msg)
+                    
+                    if gtkwave_found:
+                        self.app.show_snackbar(f"Opening {label} in GTKWave...", ft.Colors.GREEN)
+                    else:
+                        full_msg = "GTKWave not found or failed to open.\n\n"
+                        full_msg += "For WSL users:\n"
+                        full_msg += "1. Install GTKWave: sudo apt install gtkwave\n"
+                        full_msg += "2. For WSL1: Install VcXsrv on Windows\n"
+                        full_msg += "3. For WSL2 on Win11: GUI should work natively\n\n"
+                        full_msg += f"Error: {error_msg[:100]}"
+                        self.app.show_snackbar(full_msg, ft.Colors.RED, duration=8000)
+                else:
+                    # Linux/macOS: Direct call
+                    subprocess.Popen(['gtkwave', vcd_file], 
+                                   stdout=subprocess.DEVNULL, 
+                                   stderr=subprocess.DEVNULL)
+                    self.app.show_snackbar(f"Opening {label} in GTKWave...", ft.Colors.GREEN)
+                    
+            except Exception as ex:
+                self.app.show_snackbar(f"Failed to open GTKWave: {ex}", ft.Colors.RED)
+        
+        def open_student_vcd(e):
+            """Open student VCD file"""
+            open_vcd_in_gtkwave(student_result.vcd_file, "Student")
+        
+        def open_ref_vcd(e):
+            """Open reference VCD file"""
+            open_vcd_in_gtkwave(ref_result.vcd_file, "Reference (Expected)")
+        
+        # Adjust dialog height based on content
+        dialog_height = 350 if not student_result.compile_success or not student_result.run_success else 200
+        
+        content = ft.Column(content_controls, scroll=ft.ScrollMode.AUTO, height=dialog_height, width=450)
+        
+        # Build action buttons
+        actions = [ft.TextButton("Close", on_click=close_dialog)]
+        
+        # Add GTKWave buttons for both VCD files (only if simulation succeeded)
+        gtkwave_buttons = []
+        
+        if student_result.compile_success and student_result.run_success:
+            # Reference/Expected VCD button - show first (green for correct/expected)
+            if ref_result.vcd_file and os.path.exists(ref_result.vcd_file):
+                gtkwave_buttons.append(ft.ElevatedButton(
+                    "View Expected Waveform",
+                    icon=ft.Icons.CHECK_CIRCLE,
+                    on_click=open_ref_vcd,
+                    tooltip="Open reference (expected) waveform in GTKWave",
+                    style=ft.ButtonStyle(
+                        color=ft.Colors.WHITE,
+                        bgcolor=ft.Colors.GREEN,
+                    ),
+                ))
+            
+            # Student VCD button - show second (blue for student)
+            if student_result.vcd_file and os.path.exists(student_result.vcd_file):
+                gtkwave_buttons.append(ft.ElevatedButton(
+                    "View Your Waveform",
+                    icon=ft.Icons.PERSON,
+                    on_click=open_student_vcd,
+                    tooltip="Open your waveform in GTKWave",
+                    style=ft.ButtonStyle(
+                        color=ft.Colors.WHITE,
+                        bgcolor=ft.Colors.BLUE,
+                    ),
+                ))
+        
+        # Insert GTKWave buttons at the beginning (before Close button)
+        actions = gtkwave_buttons + actions
+        
+        # Determine dialog title based on status
+        if not student_result.compile_success:
+            dialog_title = "Compilation Error"
+        elif not student_result.run_success:
+            dialog_title = "Simulation Error"
+        else:
+            dialog_title = "Test Results"
         
         dialog = ft.AlertDialog(
-            title=ft.Text("Waveform"),
+            title=ft.Text(dialog_title),
             content=content,
-            actions=[
-                ft.TextButton("Close", on_click=close_dialog),
-            ],
+            actions=actions,
             actions_alignment=ft.MainAxisAlignment.END,
         )
         
@@ -1183,26 +1375,11 @@ endmodule
         prev_val = None
         prev_display_val = None
         
-        # Collect all numeric values to determine range for scaling
-        all_values = []
-        for point in data:
-            val = point.get(value_key, point.get('value', '0'))
-            num, _, is_valid, _ = self._parse_value(val)
-            if is_valid:
-                all_values.append(num)
-        
-        # Determine value range for vertical scaling
-        if all_values:
-            min_val = min(all_values)
-            max_val = max(all_values)
-            val_range = max(1, max_val - min_val)
-        else:
-            min_val = 0
-            max_val = 1
-            val_range = 1
-        
-        # Height available for waveform (20 pixels)
+        # Height for waveform display
         wave_height = 20
+        top_y = y_base
+        bottom_y = y_base + wave_height
+        mid_y = y_base + wave_height // 2
         
         for i, point in enumerate(data):
             time = point['time']
@@ -1221,56 +1398,102 @@ endmodule
             # Draw line segment from previous point to current point
             seg_width = max(2, x - prev_x)
             
-            # Calculate vertical position based on value (higher value = higher position)
-            if is_valid:
-                # Map value to y_offset (0 at bottom, max at top)
-                norm_val = (num - min_val) / val_range if val_range > 0 else 0
-                y_offset = y_base + wave_height - int(norm_val * wave_height)
-            else:
-                # Unknown value (X/Z) - show in middle with different pattern
-                y_offset = y_base + wave_height // 2
+            # Determine if this is a bus (multi-bit) or single-bit signal
+            is_bus = width > 1
             
-            # Create horizontal waveform segment
-            segment = ft.Container(
-                width=seg_width,
-                height=2,
-                bgcolor=color,
-                margin=ft.margin.only(left=prev_x, top=y_offset),
-            )
-            segments.append(segment)
-            
-            # Add value text label (only if value changed and not single bit)
-            if prev_display_val != display_val and seg_width > 15:
-                label = ft.Container(
-                    content=ft.Text(
-                        str(prev_display_val),
-                        size=8,
-                        color=color,
-                        weight=ft.FontWeight.BOLD,
-                    ),
-                    margin=ft.margin.only(left=prev_x, top=y_offset - 12),
-                )
-                segments.append(label)
-            
-            # Add vertical transition line (if value changes)
-            if prev_val != val:
-                prev_num, _, prev_valid, _ = self._parse_value(prev_val)
-                if prev_valid and is_valid:
-                    prev_norm = (prev_num - min_val) / val_range if val_range > 0 else 0
-                    curr_norm = (num - min_val) / val_range if val_range > 0 else 0
-                    y1 = y_base + wave_height - int(prev_norm * wave_height)
-                    y2 = y_base + wave_height - int(curr_norm * wave_height)
-                else:
-                    y1 = y_base + wave_height // 2
-                    y2 = y_base + wave_height // 2
-                
-                jump = ft.Container(
-                    width=1,
-                    height=abs(y2 - y1) + 2,
+            if is_bus:
+                # Bus waveform: draw at middle level with value labels
+                # Draw horizontal line at middle
+                segment = ft.Container(
+                    width=seg_width,
+                    height=2,
                     bgcolor=color,
-                    margin=ft.margin.only(left=x, top=min(y1, y2)),
+                    margin=ft.margin.only(left=prev_x, top=mid_y),
                 )
-                segments.append(jump)
+                segments.append(segment)
+                
+                # Add value text label (centered in the segment)
+                if seg_width > 20:
+                    label = ft.Container(
+                        content=ft.Text(
+                            str(prev_display_val),
+                            size=8,
+                            color=color,
+                            weight=ft.FontWeight.BOLD,
+                        ),
+                        margin=ft.margin.only(left=prev_x + seg_width//2 - 10, top=mid_y - 12),
+                    )
+                    segments.append(label)
+                
+                # Add X pattern for bus transition (when value changes)
+                if prev_val != val:
+                    # Draw X mark at transition point
+                    # Use text 'X' for clear visibility
+                    x_mark = ft.Container(
+                        content=ft.Text(
+                            "X",
+                            size=10,
+                            color=color,
+                            weight=ft.FontWeight.BOLD,
+                        ),
+                        margin=ft.margin.only(left=x - 6, top=mid_y - 8),
+                    )
+                    segments.append(x_mark)
+                    
+                    # Also draw diagonal lines for X shape
+                    x_width = 3  # half width of X
+                    # Top-left to bottom-right
+                    for dy in range(-x_width, x_width + 1):
+                        segments.append(ft.Container(
+                            width=3,
+                            height=3,
+                            bgcolor=color,
+                            margin=ft.margin.only(left=x + dy, top=mid_y + dy),
+                        ))
+                    # Top-right to bottom-left
+                    for dy in range(-x_width, x_width + 1):
+                        segments.append(ft.Container(
+                            width=3,
+                            height=3,
+                            bgcolor=color,
+                            margin=ft.margin.only(left=x - dy, top=mid_y + dy),
+                        ))
+            else:
+                # Single-bit waveform: traditional digital logic display
+                # 0 = bottom, 1 = top, X/Z = middle
+                if not is_valid:
+                    y_offset = mid_y
+                elif num == 1:
+                    y_offset = top_y
+                else:
+                    y_offset = bottom_y - 2
+                
+                # Create horizontal waveform segment
+                segment = ft.Container(
+                    width=seg_width,
+                    height=2,
+                    bgcolor=color,
+                    margin=ft.margin.only(left=prev_x, top=y_offset),
+                )
+                segments.append(segment)
+                
+                # Add vertical transition line (if value changes)
+                if prev_val != val:
+                    prev_num, _, prev_valid, _ = self._parse_value(prev_val)
+                    if not prev_valid:
+                        y1 = mid_y
+                    elif prev_num == 1:
+                        y1 = top_y
+                    else:
+                        y1 = bottom_y - 2
+                    
+                    jump = ft.Container(
+                        width=1,
+                        height=abs(y_offset - y1) + 2,
+                        bgcolor=color,
+                        margin=ft.margin.only(left=x, top=min(y_offset, y1)),
+                    )
+                    segments.append(jump)
             
             prev_x = x
             prev_val = val
@@ -1279,32 +1502,45 @@ endmodule
         # Add last point
         if data:
             last_val = data[-1].get(value_key, data[-1].get('value', '0'))
-            num, _, is_valid, display_val = self._parse_value(last_val)
-            if is_valid:
-                norm_val = (num - min_val) / val_range if val_range > 0 else 0
-                y_offset = y_base + wave_height - int(norm_val * wave_height)
+            num, width, is_valid, display_val = self._parse_value(last_val)
+            is_bus = width > 1
+            
+            if is_bus:
+                # Bus: horizontal line at middle with final value
+                last_segment = ft.Container(
+                    width=15,
+                    height=2,
+                    bgcolor=color,
+                    margin=ft.margin.only(left=prev_x, top=mid_y),
+                )
+                segments.append(last_segment)
+                
+                final_label = ft.Container(
+                    content=ft.Text(
+                        str(display_val),
+                        size=8,
+                        color=color,
+                        weight=ft.FontWeight.BOLD,
+                    ),
+                    margin=ft.margin.only(left=prev_x, top=mid_y - 12),
+                )
+                segments.append(final_label)
             else:
-                y_offset = y_base + wave_height // 2
-            
-            last_segment = ft.Container(
-                width=15,
-                height=2,
-                bgcolor=color,
-                margin=ft.margin.only(left=prev_x, top=y_offset),
-            )
-            segments.append(last_segment)
-            
-            # Add final value label
-            final_label = ft.Container(
-                content=ft.Text(
-                    str(display_val),
-                    size=8,
-                    color=color,
-                    weight=ft.FontWeight.BOLD,
-                ),
-                margin=ft.margin.only(left=prev_x, top=y_offset - 12),
-            )
-            segments.append(final_label)
+                # Single bit
+                if not is_valid:
+                    y_offset = mid_y
+                elif num == 1:
+                    y_offset = top_y
+                else:
+                    y_offset = bottom_y - 2
+                
+                last_segment = ft.Container(
+                    width=15,
+                    height=2,
+                    bgcolor=color,
+                    margin=ft.margin.only(left=prev_x, top=y_offset),
+                )
+                segments.append(last_segment)
         
         return segments
     
