@@ -48,7 +48,8 @@ Before using this application, you need to install the following software:
 
 | 软件 / Software | 用途 / Purpose | 安装说明 / Installation |
 |---|---|---|
-| **Icarus Verilog** | Verilog 仿真器 / Simulator | 见下方详细说明 / See detailed instructions below |
+| **Icarus Verilog** | Verilog 仿真器 / Simulator | 见下方 / See below |
+| **GTKWave** | 波形查看器 / Waveform viewer | 见下方 / See below |
 
 ### 安装 Icarus Verilog / Installing Icarus Verilog
 
@@ -87,10 +88,40 @@ sudo apt-get update
 sudo apt-get install -y iverilog
 ```
 
-**验证安装 / Verify installation：**
+### 安装 GTKWave / Installing GTKWave
+
+#### Windows（使用 WSL）/ Windows (Using WSL)
+
+在 WSL 中安装 GTKWave：
+
 ```bash
+wsl sudo apt-get update
+wsl sudo apt-get install -y gtkwave
+```
+
+#### macOS / macOS
+
+```bash
+brew install gtkwave
+```
+
+#### Linux（Ubuntu 22.04+）/ Linux (Ubuntu 22.04+)
+
+```bash
+sudo apt-get update
+sudo apt-get install -y gtkwave
+```
+
+**验证安装 / Verify installation：**
+
+```bash
+# 验证 iverilog / Verify iverilog
 iverilog -v
 # 预期输出 / Expected: Icarus Verilog version 12.0 (stable)
+
+# 验证 GTKWave / Verify GTKWave
+gtkwave --version
+# 预期输出 / Expected: GTKWave Analyzer version XXX
 ```
 
 ---
@@ -182,17 +213,18 @@ iverilog -v
    - Click **"Run Test"** button
    - 程序会自动编译你的代码并运行仿真
    - Application automatically compiles your code and runs simulation
-   - 显示波形图对比期望输出和实际输出
-   - Displays waveform comparing expected vs actual output
+   - 测试完成后弹出结果对话框
+   - A result dialog appears after test completes
 
 6. **查看结果** / **Check Results**
-   - 波形图中：
-   - In waveform display:
-     - **黑色**：输入信号 / **Black**: Input signals
-     - **蓝色**：期望输出 / **Blue**: Expected output
-     - **绿色**：实际输出 / **Green**: Actual output
-   - 如果波形不匹配，返回修改代码
-   - If waveforms don't match, return to modify code
+   - 测试成功后，对话框显示 **"Simulation Successful"**
+   - On success, dialog shows **"Simulation Successful"**
+   - 点击 **"View Expected Waveform"** 在 GTKWave 中查看期望波形（正确答案）
+   - Click **"View Expected Waveform"** to open expected waveform in GTKWave
+   - 点击 **"View Your Waveform"** 在 GTKWave 中查看你的实际波形
+   - Click **"View Your Waveform"** to open your waveform in GTKWave
+   - 对比两个波形，找出不匹配的地方，返回修改代码
+   - Compare both waveforms, find mismatches, then return to modify code
 
 7. **保存继续** / **Save and Continue**
    - 测试通过后，点击 **"保存并继续"**
@@ -283,15 +315,24 @@ sudo ./verilog-quiz-linux
 3. 检查是否缺少分号 `;` 或括号不匹配
 4. 参考 Testbench 中的端口定义
 
-### Q5: 波形图不显示或显示异常
+### Q5: 提示 "GTKWave not found" 或无法打开波形
+
+**A:**
+1. 确认 GTKWave 已正确安装：`gtkwave --version`
+2. **Windows**: 确保 GTKWave 安装在 `C:\Program Files\GTKWave\bin\gtkwave.exe`
+3. **WSL**: 在 WSL 中执行 `sudo apt-get install -y gtkwave`
+4. 程序启动时会在控制台显示 GTKWave 检测状态，请查看确认
+
+### Q6: 波形图对比发现不匹配
 
 **A:**
 1. 确认代码编译成功（无红色错误提示）
-2. 检查 Testbench 中的 `$display` 输出格式
-3. 确认模块端口连接正确
-4. 重新运行测试
+2. 在 GTKWave 中同时打开 **View Expected Waveform** 和 **View Your Waveform**
+3. 对比两个波形，找出信号值或时序不一致的地方
+4. 检查 Testbench 中的端口连接是否正确
+5. 返回修改代码后重新运行测试
 
-### Q6: 报告生成失败
+### Q7: 报告生成失败
 
 **A:**
 1. 确认已完成所有题目（显示"已完成"状态）

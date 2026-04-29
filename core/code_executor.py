@@ -33,7 +33,10 @@ class CodeExecutor:
     def __init__(self):
         self.system = platform.system()
         self.use_wsl = False
+        self.gtkwave_available = False
+        self.gtkwave_mode = None  # 'native', 'wsl', or None
         self._detect_iverilog()
+        self._detect_gtkwave()
     
     def _detect_iverilog(self):
         """Detect iverilog environment"""
@@ -57,6 +60,40 @@ class CodeExecutor:
                     print("Detected iverilog (WSL)")
                 except (subprocess.CalledProcessError, FileNotFoundError):
                     print("Warning: iverilog not detected (Windows/WSL)")
+    
+    def _detect_gtkwave(self):
+        """Detect GTKWave environment"""
+        if self.system in ['Linux', 'Darwin']:
+            # Linux/Mac: check if gtkwave is in PATH
+            try:
+                subprocess.run(['gtkwave', '--version'], capture_output=True, check=True)
+                self.gtkwave_available = True
+                self.gtkwave_mode = 'native'
+                print("Detected GTKWave (Linux/Mac)")
+            except (subprocess.CalledProcessError, FileNotFoundError):
+                print("Warning: GTKWave not detected, please install")
+        else:
+            # Windows: Try native first, then WSL
+            # 1. Try native GTKWave.exe
+            gtkwave_paths = [
+                r"C:\Program Files\GTKWave\bin\gtkwave.exe",
+                r"C:\Program Files (x86)\GTKWave\bin\gtkwave.exe",
+            ]
+            for path in gtkwave_paths:
+                if os.path.exists(path):
+                    self.gtkwave_available = True
+                    self.gtkwave_mode = 'native'
+                    print(f"Detected GTKWave (Windows native): {path}")
+                    return
+            
+            # 2. Try WSL GTKWave
+            try:
+                subprocess.run(['wsl', 'which', 'gtkwave'], capture_output=True, check=True)
+                self.gtkwave_available = True
+                self.gtkwave_mode = 'wsl'
+                print("Detected GTKWave (WSL)")
+            except (subprocess.CalledProcessError, FileNotFoundError):
+                print("Warning: GTKWave not detected (Windows/WSL)")
     
     def _run_command(self, cmd: List[str], cwd: str = None, timeout: int = 30) -> Tuple[bool, str, str]:
         """
