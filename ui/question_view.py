@@ -1177,14 +1177,37 @@ endmodule
     
     def _build_signal_waveform(self, data: list, min_time: int, time_scale: float, 
                                 value_key: str, color: str, y_base: int) -> list:
-        """Build waveform segment for single signal"""
+        """Build waveform segment for single signal (supports multi-bit values)"""
         segments = []
         prev_x = 0
         prev_val = None
+        prev_display_val = None
+        
+        # Collect all numeric values to determine range for scaling
+        all_values = []
+        for point in data:
+            val = point.get(value_key, point.get('value', '0'))
+            num, _, is_valid, _ = self._parse_value(val)
+            if is_valid:
+                all_values.append(num)
+        
+        # Determine value range for vertical scaling
+        if all_values:
+            min_val = min(all_values)
+            max_val = max(all_values)
+            val_range = max(1, max_val - min_val)
+        else:
+            min_val = 0
+            max_val = 1
+            val_range = 1
+        
+        # Height available for waveform (20 pixels)
+        wave_height = 20
         
         for i, point in enumerate(data):
             time = point['time']
             val = point.get(value_key, point.get('value', '0'))
+            num, width, is_valid, display_val = self._parse_value(val)
             
             # Calculate x position
             x = int((time - min_time) * time_scale)
@@ -1192,35 +1215,54 @@ endmodule
             if i == 0:
                 prev_x = x
                 prev_val = val
+                prev_display_val = display_val
                 continue
             
             # Draw line segment from previous point to current point
-            width = max(2, x - prev_x)
+            seg_width = max(2, x - prev_x)
             
-            # Convert value to logic level (0=low, 1=high, 2=unknown)
-            val_num = self._parse_logic_value(prev_val)
-            
-            # Waveform height position (high level on top, low level on bottom)
-            if val_num == 1:
-                y_offset = y_base  # high level
-            elif val_num == 0:
-                y_offset = y_base + 12  # low level
+            # Calculate vertical position based on value (higher value = higher position)
+            if is_valid:
+                # Map value to y_offset (0 at bottom, max at top)
+                norm_val = (num - min_val) / val_range if val_range > 0 else 0
+                y_offset = y_base + wave_height - int(norm_val * wave_height)
             else:
-                y_offset = y_base + 6  # intermediate state
+                # Unknown value (X/Z) - show in middle with different pattern
+                y_offset = y_base + wave_height // 2
             
             # Create horizontal waveform segment
             segment = ft.Container(
-                width=width,
-                height=2 if val_num != 2 else 6,
+                width=seg_width,
+                height=2,
                 bgcolor=color,
                 margin=ft.margin.only(left=prev_x, top=y_offset),
             )
             segments.append(segment)
             
+            # Add value text label (only if value changed and not single bit)
+            if prev_display_val != display_val and seg_width > 15:
+                label = ft.Container(
+                    content=ft.Text(
+                        str(prev_display_val),
+                        size=8,
+                        color=color,
+                        weight=ft.FontWeight.BOLD,
+                    ),
+                    margin=ft.margin.only(left=prev_x, top=y_offset - 12),
+                )
+                segments.append(label)
+            
             # Add vertical transition line (if value changes)
             if prev_val != val:
-                y1 = y_base if self._parse_logic_value(prev_val) == 1 else y_base + 12
-                y2 = y_base if self._parse_logic_value(val) == 1 else y_base + 12
+                prev_num, _, prev_valid, _ = self._parse_value(prev_val)
+                if prev_valid and is_valid:
+                    prev_norm = (prev_num - min_val) / val_range if val_range > 0 else 0
+                    curr_norm = (num - min_val) / val_range if val_range > 0 else 0
+                    y1 = y_base + wave_height - int(prev_norm * wave_height)
+                    y2 = y_base + wave_height - int(curr_norm * wave_height)
+                else:
+                    y1 = y_base + wave_height // 2
+                    y2 = y_base + wave_height // 2
                 
                 jump = ft.Container(
                     width=1,
@@ -1232,42 +1274,112 @@ endmodule
             
             prev_x = x
             prev_val = val
+            prev_display_val = display_val
         
         # Add last point
         if data:
             last_val = data[-1].get(value_key, data[-1].get('value', '0'))
-            val_num = self._parse_logic_value(last_val)
-            y_offset = y_base if val_num == 1 else (y_base + 12 if val_num == 0 else y_base + 6)
+            num, _, is_valid, display_val = self._parse_value(last_val)
+            if is_valid:
+                norm_val = (num - min_val) / val_range if val_range > 0 else 0
+                y_offset = y_base + wave_height - int(norm_val * wave_height)
+            else:
+                y_offset = y_base + wave_height // 2
             
             last_segment = ft.Container(
                 width=15,
-                height=2 if val_num != 2 else 6,
+                height=2,
                 bgcolor=color,
                 margin=ft.margin.only(left=prev_x, top=y_offset),
             )
             segments.append(last_segment)
+            
+            # Add final value label
+            final_label = ft.Container(
+                content=ft.Text(
+                    str(display_val),
+                    size=8,
+                    color=color,
+                    weight=ft.FontWeight.BOLD,
+                ),
+                margin=ft.margin.only(left=prev_x, top=y_offset - 12),
+            )
+            segments.append(final_label)
         
         return segments
     
-    def _parse_logic_value(self, val: str) -> int:
-        """Parse logic value to number (0=low, 1=high, 2=unknown/other)"""
-        if val in ['0', "1'b0", "1'h0"]:
-            return 0
-        elif val in ['1', "1'b1", "1'h1"]:
-            return 1
-        elif val in ['x', 'X', 'z', 'Z', '?']:
-            return 2
-        else:
-            # Try to parse number
+    def _parse_value(self, val: str) -> tuple:
+        """
+        Parse value to (numeric_value, bit_width, is_valid, display_string)
+        
+        Returns:
+            (num, width, is_valid, display_str)
+        """
+        val = str(val).strip()
+        
+        # Handle X/Z (unknown)
+        if val in ['x', 'X', 'z', 'Z', '?', 'X', 'Z']:
+            return (0, 1, False, val)
+        
+        # Handle binary: 4'b1010, 8'b00001111
+        binary_match = re.match(r"(\d+)'b([01_xzXZ]+)", val)
+        if binary_match:
+            width = int(binary_match.group(1))
+            bits = binary_match.group(2).replace('_', '')
+            # Remove X/Z for numeric value
+            clean_bits = bits.replace('x', '0').replace('X', '0').replace('z', '0').replace('Z', '0')
             try:
-                if val.startswith("1'b"):
-                    return int(val[3:])
-                elif val.startswith("1'h"):
-                    return int(val[3:], 16) % 2
-                else:
-                    return int(val) % 2
+                num = int(clean_bits, 2)
+                return (num, width, True, val)
             except:
-                return 2
+                return (0, width, False, val)
+        
+        # Handle hex: 8'hFF, 4'hA
+        hex_match = re.match(r"(\d+)'h([0-9a-fA-F_xzXZ]+)", val)
+        if hex_match:
+            width = int(hex_match.group(1))
+            hex_str = hex_match.group(2).replace('_', '')
+            clean_hex = ''.join(c for c in hex_str if c.isdigit() or c.lower() in 'abcdef')
+            if clean_hex:
+                try:
+                    num = int(clean_hex, 16)
+                    return (num, width, True, val)
+                except:
+                    pass
+            return (0, width, False, val)
+        
+        # Handle decimal: 4'd10, d'255
+        dec_match = re.match(r"(\d+)'d(\d+)", val)
+        if dec_match:
+            width = int(dec_match.group(1))
+            num = int(dec_match.group(2))
+            return (num, width, True, val)
+        
+        # Handle simple binary: 1'b0, 1'b1
+        if val.startswith("1'b"):
+            try:
+                num = int(val[3:].replace('x', '0').replace('X', '0').replace('z', '0').replace('Z', '0'))
+                return (num, 1, True, val)
+            except:
+                return (0, 1, False, val)
+        
+        # Handle simple hex: 1'h0, 1'h1
+        if val.startswith("1'h"):
+            try:
+                num = int(val[3:], 16)
+                return (num, 1, True, val)
+            except:
+                return (0, 1, False, val)
+        
+        # Handle plain integer
+        try:
+            num = int(val)
+            return (num, 32, True, val)  # Assume 32-bit for plain integers
+        except:
+            pass
+        
+        # Unknown format
+        return (0, 1, False, val)
     
     def _extract_all_signals(self, output: str) -> list:
         """Extract all signal names from output"""
