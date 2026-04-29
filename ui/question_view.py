@@ -1002,49 +1002,79 @@ endmodule
             self.app.page.update()
         
         def extract_signals_from_vcd(vcd_file: str) -> list:
-            """Extract all signal names from VCD file"""
-            signals = []
+            """Extract all signal names from VCD file.
+            
+            Icarus Verilog's $dumpvars dumps signals in both the testbench top-level
+            and the DUT sub-module, often with DIFFERENT identifiers for the same
+            port-connected signal. We deduplicate by base signal name (e.g. 'a'),
+            keeping the deepest hierarchical path (the DUT port view).
+            """
             try:
                 with open(vcd_file, 'r', encoding='utf-8', errors='ignore') as f:
                     content = f.read()
-                    
-                # Parse $var sections: $var wire 1 ! a $end
-                # Format: $var <type> <size> <identifier> <name> $end
-                var_pattern = r'\$var\s+\w+\s+\d+\s+(\S+)\s+(\S+)\s*\$end'
-                for match in re.finditer(var_pattern, content):
-                    identifier = match.group(1)
-                    name = match.group(2)
-                    if name and name not in signals:
-                        signals.append(name)
                 
-                # Also try to extract scope information for full hierarchical names
                 scope_stack = []
-                hierarchical_signals = []
-                lines = content.split('\n')
-                i = 0
-                while i < len(lines):
-                    line = lines[i].strip()
+                all_signals = []  # list of (full_path, base_name, depth)
+                in_var = False
+                var_parts = []
+                
+                for raw_line in content.split('\n'):
+                    line = raw_line.strip()
+                    
                     if line.startswith('$scope'):
                         parts = line.split()
                         if len(parts) >= 3:
                             scope_stack.append(parts[2])
+                        in_var = False
                     elif line.startswith('$upscope'):
                         if scope_stack:
                             scope_stack.pop()
+                        in_var = False
                     elif line.startswith('$var'):
-                        parts = line.split()
-                        if len(parts) >= 5:
-                            name = parts[4]
+                        var_parts = line.split()
+                        if '$end' in line:
+                            if len(var_parts) >= 5:
+                                name = var_parts[4]
+                                if scope_stack:
+                                    full_name = '.'.join(scope_stack) + '.' + name
+                                else:
+                                    full_name = name
+                                depth = full_name.count('.')
+                                all_signals.append((full_name, name, depth))
+                            in_var = False
+                        else:
+                            in_var = True
+                    elif in_var and line.startswith('$end'):
+                        if len(var_parts) >= 5:
+                            name = var_parts[4]
                             if scope_stack:
                                 full_name = '.'.join(scope_stack) + '.' + name
                             else:
                                 full_name = name
-                            if full_name not in hierarchical_signals:
-                                hierarchical_signals.append(full_name)
-                    i += 1
+                            depth = full_name.count('.')
+                            all_signals.append((full_name, name, depth))
+                        in_var = False
+                        var_parts = []
+                    elif in_var:
+                        var_parts.extend(line.split())
                 
-                # Return hierarchical signals if found, otherwise simple signals
-                return hierarchical_signals if hierarchical_signals else signals
+                if not all_signals:
+                    return []
+                
+                # Deduplicate by base signal name, keep DEEPEST path
+                # This handles the case where tb.a and tb.dut.a have different
+                # VCD identifiers but are the same physical port-connected signal.
+                name_to_best = {}
+                for full_name, base_name, depth in all_signals:
+                    if base_name not in name_to_best:
+                        name_to_best[base_name] = (full_name, depth)
+                    elif depth > name_to_best[base_name][1]:
+                        name_to_best[base_name] = (full_name, depth)
+                
+                result = [info[0] for info in name_to_best.values()]
+                # Sort by depth then alphabetically
+                result.sort(key=lambda s: (s.count('.'), s))
+                return result
             except Exception as e:
                 print(f"Error extracting signals from VCD: {e}")
                 return []
