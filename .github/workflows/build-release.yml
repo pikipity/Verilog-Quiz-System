@@ -88,14 +88,17 @@ jobs:
         shell: bash
         run: |
           set -e
-          # flet build 默认输出到 dist/<platform>/ 或 build/<platform>/
-          if [ -d "dist/${{ matrix.target }}" ]; then
+          # flet build --output dist 直接输出到 dist/ 目录（不再创建 platform 子目录）
+          # 检查 dist/ 目录是否有构建产物（可执行文件、app bundle 等）
+          # 排除 site-packages 等安装目录
+          if [ -f "dist/verilog-quiz-system" ] || [ -d "dist/verilog-quiz-system" ] || [ -f "dist/verilog-quiz-system.exe" ] || [ -d "dist/verilog-quiz-system.app" ]; then
+            PLATFORM_DIR="dist"
+          elif [ -d "dist/${{ matrix.target }}" ]; then
             PLATFORM_DIR="dist/${{ matrix.target }}"
           elif [ -d "build/${{ matrix.target }}" ]; then
             PLATFORM_DIR="build/${{ matrix.target }}"
           else
-            echo "ERROR: flet build output directory not found!"
-            echo "Checked: dist/${{ matrix.target }}/ and build/${{ matrix.target }}/"
+            echo "ERROR: flet build output not found!"
             echo "Contents of dist/:"
             ls -la dist/ 2>/dev/null || true
             echo "Contents of build/:"
