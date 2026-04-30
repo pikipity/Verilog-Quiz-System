@@ -128,7 +128,7 @@ gtkwave --version
 
 ## 下载与运行 / Download and Run
 
-### 从 GitHub 下载可执行文件 / Download Executable from GitHub
+### 从 GitHub 下载 / Download from GitHub
 
 1. **访问 Releases 页面** / **Visit Releases page**
    - 打开：https://github.com/pikipity/Verilog-Quiz-System/releases
@@ -137,25 +137,30 @@ gtkwave --version
 2. **下载对应版本** / **Download for your platform**
    | 平台 / Platform | 下载文件 / Download File |
    |---|---|
-   | Windows | `verilog-quiz-windows.exe` |
-   | Linux (Ubuntu) | `verilog-quiz-linux` |
-   | macOS | `verilog-quiz-macos` |
+   | Windows | `verilog-quiz-windows.zip` |
+   | Linux (Ubuntu) | `verilog-quiz-linux.zip` |
+   | macOS | `verilog-quiz-macos.zip` |
 
-3. **运行程序** / **Run the application**
+3. **解压文件** / **Extract the zip**
+   - Windows：右键 zip 文件 → "解压全部" / Right-click → "Extract All"
+   - Linux/macOS：`unzip verilog-quiz-linux.zip`
+
+4. **运行程序** / **Run the application**
 
    **Windows：**
-   - 双击 `verilog-quiz-windows.exe` 运行
+   - 进入解压后的文件夹
+   - 双击 `verilog-quiz-system.exe` 运行
 
    **Linux/macOS：**
    ```bash
-   # 1. 打开终端，进入下载目录 / Open terminal, navigate to download directory
-   cd ~/Downloads
+   # 1. 打开终端，进入解压后的目录 / Open terminal, navigate to extracted directory
+   cd ~/Downloads/verilog-quiz-linux
    
    # 2. 赋予执行权限 / Add execute permission
-   chmod +x verilog-quiz-linux
+   chmod +x verilog-quiz-system
    
    # 3. 运行 / Run
-   ./verilog-quiz-linux
+   ./verilog-quiz-system
    ```
 
 ---
@@ -301,10 +306,10 @@ To view or backup your code and progress:
 **A:**
 ```bash
 # 赋予执行权限
-chmod +x verilog-quiz-linux
+chmod +x verilog-quiz-system
 
 # 或者以管理员权限运行（不推荐）
-sudo ./verilog-quiz-linux
+sudo ./verilog-quiz-system
 ```
 
 ### Q4: 编译失败，提示语法错误
