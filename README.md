@@ -150,20 +150,28 @@ python main.py
 
 ### 方法二：使用预编译可执行文件（推荐普通用户）
 
-1. 从 [Releases](https://github.com/yourusername/Verilog-Quiz-System/releases) 页面下载对应平台的可执行文件：
-   - Windows: `verilog-quiz-windows.exe`
-   - Linux: `verilog-quiz-linux`
-   - macOS: `verilog-quiz-macos`
+1. 从 [Releases](https://github.com/yourusername/Verilog-Quiz-System/releases) 页面下载对应平台的 zip 文件：
+   - Windows: `verilog-quiz-windows.zip`
+   - Linux: `verilog-quiz-linux.zip`
+   - macOS: `verilog-quiz-macos.zip`
 
-2. **Windows**：双击运行
+2. 解压 zip 文件到任意目录
 
-3. **Linux/macOS**：
+3. **运行程序**：
+
+   **Windows：**
+   - 进入解压后的文件夹，双击 `verilog-quiz-system.exe` 运行
+
+   **Linux/macOS：**
 ```bash
-# 赋予执行权限
-chmod +x verilog-quiz-linux
+# 1. 进入解压后的目录
+cd verilog-quiz-linux
 
-# 运行
-./verilog-quiz-linux
+# 2. 赋予执行权限
+chmod +x verilog-quiz-system
+
+# 3. 运行
+./verilog-quiz-system
 ```
 
 ## 使用说明
@@ -314,7 +322,7 @@ pyinstaller --onefile --name verilog-quiz-macos main.py
 
 **A:**
 ```bash
-chmod +x verilog-quiz-linux
+chmod +x verilog-quiz-system
 ```
 
 ### Q: 报告中的图片显示不正常
