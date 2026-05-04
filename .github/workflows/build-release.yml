@@ -69,6 +69,9 @@ jobs:
           git clone https://github.com/flutter/flutter.git -b stable --depth 1
           export PATH="$PWD/flutter/bin:$PATH"
           echo "$PWD/flutter/bin" >> "$GITHUB_PATH"
+          # 下载完整的 Flutter 构建依赖（sky_engine 等）
+          flutter config --no-analytics
+          flutter precache --linux
           flutter --version
 
       # ========== 4. 设置 Python ==========
