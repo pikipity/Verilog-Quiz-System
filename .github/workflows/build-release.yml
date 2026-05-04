@@ -130,12 +130,22 @@ jobs:
           echo "Packaging directory: $PLATFORM_DIR"
           ls -la "$PLATFORM_DIR"
 
-          # 打包（macOS/Linux 用 zip 命令保留 Unix 权限，Windows 用 Python）
+          # 打包
           mkdir -p release
           ZIP_NAME="verilog-quiz-${{ matrix.target }}.zip"
           if [ "${{ matrix.target }}" = "windows" ]; then
+            # Windows: Python 打包整个 dist/ 目录
             python -c "import shutil; shutil.make_archive('release/verilog-quiz-${{ matrix.target }}', 'zip', '$PLATFORM_DIR')"
+          elif [ "${{ matrix.target }}" = "macos" ] || [ "${{ matrix.target }}" = "macos-intel" ]; then
+            # macOS: 只打包 .app bundle，不打包 dist/ 下的其他文件
+            APP_BUNDLE=$(find "$PLATFORM_DIR" -maxdepth 1 -name "*.app" -type d | head -1)
+            if [ -n "$APP_BUNDLE" ]; then
+              (cd "$PLATFORM_DIR" && zip -r "$(pwd)/../release/$ZIP_NAME" "$(basename "$APP_BUNDLE")")
+            else
+              (cd "$PLATFORM_DIR" && zip -r "$(pwd)/../release/$ZIP_NAME" .)
+            fi
           else
+            # Linux: 用 zip 命令保留 Unix 权限
             (cd "$PLATFORM_DIR" && zip -r "$(pwd)/../release/$ZIP_NAME" .)
           fi
           echo "Created: release/$ZIP_NAME"
