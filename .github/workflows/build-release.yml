@@ -37,9 +37,13 @@ jobs:
             target: macos
             ext: ''
             build_cmd: macos
+          - os: ubuntu-24.04-arm
+            target: linux-arm64
+            ext: ''
+            build_cmd: linux
 
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 45    # flet build 下载 Flutter SDK 可能较久
+    timeout-minutes: 45
     env:
       PYTHONIOENCODING: utf-8
       PYTHONLEGACYWINDOWSSTDIO: utf-8
@@ -49,29 +53,36 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # ========== 2. 安装 Linux 系统依赖（仅 Linux）==========
+      # ========== 2. 安装 Linux 系统依赖（x64 & ARM64）==========
       - name: Install Linux dependencies
-        if: matrix.target == 'linux'
+        if: startsWith(matrix.target, 'linux')
         run: |
           sudo apt-get update
           sudo apt-get install -y clang cmake ninja-build pkg-config libblkid-dev liblzma-dev libgtk-3-dev libstdc++-12-dev
 
-      # ========== 3. 设置 Python ==========
+      # ========== 3. ARM64 预装 Flutter SDK ==========
+      # ARM64 runner 上 flet build 无法自动下载 Flutter SDK，需手动安装
+      - name: Setup Flutter SDK (ARM64)
+        if: matrix.target == 'linux-arm64'
+        run: |
+          echo "Installing Flutter SDK for ARM64..."
+          git clone https://github.com/flutter/flutter.git -b stable --depth 1
+          echo "$PWD/flutter/bin" >> "$GITHUB_PATH"
+          flutter --version
+
+      # ========== 4. 设置 Python ==========
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
-      # ========== 4. 安装 Python 依赖 ==========
+      # ========== 5. 安装 Python 依赖 ==========
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install flet flet-desktop cryptography requests
 
-      # ========== 5. 用 flet build 打包 ==========
-      # flet build 会自动下载 Flutter SDK（~500MB）
-      # CI 无 TTY，分平台用不同方式自动确认安装
-
+      # ========== 6. 用 flet build 打包 ==========
       - name: Build with flet (Windows)
         if: matrix.target == 'windows'
         shell: cmd
@@ -79,18 +90,20 @@ jobs:
           chcp 65001 >nul
           echo y | flet build windows --output dist
 
-      - name: Build with flet (Linux/macOS)
-        if: matrix.target != 'windows'
+      - name: Build with flet (Linux x64 & macOS)
+        if: matrix.target != 'windows' && matrix.target != 'linux-arm64'
         run: yes | flet build ${{ matrix.build_cmd }} --output dist
 
-      # ========== 6. 整理构建产物：打包成 zip ==========
+      - name: Build with flet (Linux ARM64)
+        if: matrix.target == 'linux-arm64'
+        run: flet build ${{ matrix.build_cmd }} --output dist
+
+      # ========== 7. 整理构建产物：打包成 zip ==========
       - name: Prepare artifact
         shell: bash
         run: |
           set -e
-          # flet build --output dist 直接输出到 dist/ 目录（不再创建 platform 子目录）
-          # 检查 dist/ 目录是否有构建产物（可执行文件、app bundle 等）
-          # 排除 site-packages 等安装目录
+          # flet build --output dist 直接输出到 dist/ 目录
           if [ -f "dist/verilog-quiz-system" ] || [ -d "dist/verilog-quiz-system" ] || [ -f "dist/verilog-quiz-system.exe" ] || [ -d "dist/verilog-quiz-system.app" ]; then
             PLATFORM_DIR="dist"
           elif [ -d "dist/${{ matrix.target }}" ]; then
@@ -109,13 +122,13 @@ jobs:
           echo "Packaging directory: $PLATFORM_DIR"
           ls -la "$PLATFORM_DIR"
 
-          # 用 Python 创建 zip（跨平台一致，避免 shell 路径问题）
+          # 用 Python 创建 zip
           mkdir -p release
           python -c "import shutil; shutil.make_archive('release/verilog-quiz-${{ matrix.target }}', 'zip', '$PLATFORM_DIR')"
           echo "Created: release/verilog-quiz-${{ matrix.target }}.zip"
           ls -lh release/
 
-      # ========== 7. 上传构建产物 ==========
+      # ========== 8. 上传构建产物 ==========
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
@@ -123,7 +136,7 @@ jobs:
           path: release/*.zip
           retention-days: 30
 
-      # ========== 8. 创建 Release ==========
+      # ========== 9. 创建 Release ==========
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
@@ -144,20 +157,21 @@ jobs:
             1. 下载对应平台的 **zip 文件**
             2. 解压到任意目录
             3. 运行解压后的程序：
-               - **Windows**: 双击 `verilog_quiz.exe`
-               - **Linux**: `./verilog_quiz`
-               - **macOS**: 双击应用图标或 `./verilog_quiz`
+               - **Windows**: 双击 `verilog-quiz-system.exe`
+               - **Linux**: `./verilog-quiz-system`
+               - **macOS**: 双击应用图标或 `./verilog-quiz-system`
 
             ### 下载文件
-            | 文件 | 平台 | 说明 |
-            |------|------|------|
-            | `verilog-quiz-windows.zip` | Windows 10/11 | 解压后双击 exe 运行 |
-            | `verilog-quiz-linux.zip` | Ubuntu 22.04+ | 解压后赋予执行权限并运行 |
-            | `verilog-quiz-macos.zip` | macOS 15.0+ | 解压后运行 |
+            | 文件 | 平台 | 架构 | 说明 |
+            |------|------|------|------|
+            | `verilog-quiz-windows.zip` | Windows 10/11 | x64 | 解压后双击 exe 运行 |
+            | `verilog-quiz-linux.zip` | Ubuntu 22.04+ | x64 | 解压后赋予执行权限并运行 |
+            | `verilog-quiz-linux-arm64.zip` | Ubuntu 24.04+ | ARM64 | 解压后赋予执行权限并运行 |
+            | `verilog-quiz-macos.zip` | macOS 15.0+ | ARM64 | 解压后运行 |
 
             ### 系统要求
             - **Windows**: Windows 10/11，需预装 iverilog 和 GTKWave
-            - **Linux**: Ubuntu 22.04+，需预装 iverilog 和 GTKWave
+            - **Linux**: Ubuntu 22.04+ (x64) / Ubuntu 24.04+ (ARM64)，需预装 iverilog 和 GTKWave
             - **macOS**: macOS 15.0+，需预装 iverilog 和 GTKWave
           files: release/*.zip
           draft: false
