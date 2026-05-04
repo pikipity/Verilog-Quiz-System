@@ -37,6 +37,10 @@ jobs:
             target: macos
             ext: ''
             build_cmd: macos
+          - os: macos-13
+            target: macos-intel
+            ext: ''
+            build_cmd: macos
           - os: ubuntu-24.04-arm
             target: linux-arm64
             ext: ''
@@ -126,10 +130,15 @@ jobs:
           echo "Packaging directory: $PLATFORM_DIR"
           ls -la "$PLATFORM_DIR"
 
-          # 用 Python 创建 zip
+          # 打包（macOS/Linux 用 zip 命令保留 Unix 权限，Windows 用 Python）
           mkdir -p release
-          python -c "import shutil; shutil.make_archive('release/verilog-quiz-${{ matrix.target }}', 'zip', '$PLATFORM_DIR')"
-          echo "Created: release/verilog-quiz-${{ matrix.target }}.zip"
+          ZIP_NAME="verilog-quiz-${{ matrix.target }}.zip"
+          if [ "${{ matrix.target }}" = "windows" ]; then
+            python -c "import shutil; shutil.make_archive('release/verilog-quiz-${{ matrix.target }}', 'zip', '$PLATFORM_DIR')"
+          else
+            (cd "$PLATFORM_DIR" && zip -r "$(pwd)/../release/$ZIP_NAME" .)
+          fi
+          echo "Created: release/$ZIP_NAME"
           ls -lh release/
 
       # ========== 8. 上传构建产物 ==========
@@ -171,12 +180,19 @@ jobs:
             | `verilog-quiz-windows.zip` | Windows 10/11 | x64 | 解压后双击 exe 运行 |
             | `verilog-quiz-linux.zip` | Ubuntu 22.04+ | x64 | 解压后赋予执行权限并运行 |
             | `verilog-quiz-linux-arm64.zip` | Ubuntu 24.04+ | ARM64 | 解压后赋予执行权限并运行 |
-            | `verilog-quiz-macos.zip` | macOS 15.0+ | ARM64 | 解压后运行 |
+            | `verilog-quiz-macos.zip` | macOS 14+ | ARM64 (Apple Silicon) | 解压后运行 |
+            | `verilog-quiz-macos-intel.zip` | macOS 13+ | x64 (Intel) | 解压后运行 |
+
+            ### macOS 运行注意事项
+            由于应用未经过 Apple 签名，首次运行时可能被 Gatekeeper 阻止：
+            1. 右键点击应用图标，选择"打开"
+            2. 或在终端运行：`xattr -cr verilog-quiz-system.app`
+            3. 然后双击应用图标运行
 
             ### 系统要求
             - **Windows**: Windows 10/11，需预装 iverilog 和 GTKWave
             - **Linux**: Ubuntu 22.04+ (x64) / Ubuntu 24.04+ (ARM64)，需预装 iverilog 和 GTKWave
-            - **macOS**: macOS 15.0+，需预装 iverilog 和 GTKWave
+            - **macOS**: macOS 13+ (Intel) / macOS 14+ (Apple Silicon)，需预装 iverilog 和 GTKWave
           files: release/*.zip
           draft: false
           prerelease: false
