@@ -106,7 +106,7 @@ jobs:
         if: matrix.target == 'linux-arm64'
         run: flet build ${{ matrix.build_cmd }} --output dist
 
-      # ========== 7. 整理构建产物：打包成 zip ==========
+      # ========== 7. 整理构建产物：清理开发文件并打包成 zip ==========
       - name: Prepare artifact
         shell: bash
         run: |
@@ -127,10 +127,60 @@ jobs:
             exit 1
           fi
 
-          echo "Packaging directory: $PLATFORM_DIR"
+          echo "Original size before cleanup:"
+          du -sh "$PLATFORM_DIR" || true
+          echo "---"
+
+          # ========== 清理不需要的 Flutter SDK 开发文件 ==========
+          # 这些文件被 flet build 带入输出目录，运行时完全不需要，
+          # 但会占用大量磁盘空间（dart-sdk 可达 500MB+）
+
+          # 1. 删除 dart-sdk 完整目录（开发工具，运行时不需要）
+          find "$PLATFORM_DIR" -type d -name "dart-sdk" -exec rm -rf {} + 2>/dev/null || true
+
+          # 2. 删除 Flutter 开发工具快照
+          find "$PLATFORM_DIR" -type f \( \
+            -name "flutter_tools.snapshot" -o \
+            -name "analysis_server.dart.snapshot" -o \
+            -name "dart2js.dart.snapshot" -o \
+            -name "gen_snapshot" -o \
+            -name "dart" -o \
+            -name "dart.exe" \
+          \) -delete 2>/dev/null || true
+
+          # 3. 删除缓存中的构建产物和包缓存（保留 engine 库）
+          find "$PLATFORM_DIR" -type d -path "*/flutter/bin/cache/artifacts" -exec rm -rf {} + 2>/dev/null || true
+          find "$PLATFORM_DIR" -type d -path "*/flutter/bin/cache/pkg" -exec rm -rf {} + 2>/dev/null || true
+
+          # 4. 删除示例、文档、测试代码
+          find "$PLATFORM_DIR" -type d \( \
+            -name "examples" -o \
+            -name "example" -o \
+            -name "docs" -o \
+            -name "doc" -o \
+            -name "test" -o \
+            -name "tests" -o \
+            -name "benchmark" -o \
+            -name "dev" \
+          \) -exec rm -rf {} + 2>/dev/null || true
+
+          # 5. 删除静态库（.a）和符号表（运行时只需要 .so/.dll/.dylib）
+          find "$PLATFORM_DIR" -type f -name "*.a" -delete 2>/dev/null || true
+
+          # 6. 删除头文件和开发用的 C++ 源码
+          find "$PLATFORM_DIR" -type f \( -name "*.h" -o -name "*.hpp" -o -name "*.cc" -o -name "*.cpp" \) -delete 2>/dev/null || true
+
+          # 7. 删除不需要的字体缓存和中间文件
+          find "$PLATFORM_DIR" -type f -name "*.stamp" -delete 2>/dev/null || true
+          find "$PLATFORM_DIR" -type f -name "*.d" -delete 2>/dev/null || true
+
+          echo "Size after cleanup:"
+          du -sh "$PLATFORM_DIR" || true
+          echo "---"
+          echo "Files remaining in $PLATFORM_DIR:"
           ls -la "$PLATFORM_DIR"
 
-          # 打包
+          # ========== 打包 ==========
           mkdir -p release
           ZIP_NAME="verilog-quiz-${{ matrix.target }}.zip"
           if [ "${{ matrix.target }}" = "windows" ]; then
