@@ -30,9 +30,13 @@ This manual is designed for EIE330 course students, providing detailed instructi
 
 **特别提醒 / Special Note：**
 
-本课程所有学生均使用 **VirtualBox + Ubuntu** 环境。请确保你的虚拟机系统为 **Ubuntu 22.04 LTS** 或 **Ubuntu 24.04 LTS**。即使你是 Linux 初学者，也不用担心！本手册会详细介绍所有必要的 Linux 基础操作。
+本课程所有学生均使用 **VirtualBox + Ubuntu** 环境。请确保你的虚拟机系统为 **Ubuntu 22.04 LTS** 或 **Ubuntu 24.04 LTS**。
 
-All students in this course use the **VirtualBox + Ubuntu** environment. Please ensure your virtual machine is running **Ubuntu 22.04 LTS** or **Ubuntu 24.04 LTS**. Don't worry if you're new to Linux! This manual will detail all necessary basic Linux operations.
+> 如果不熟悉 Linux 命令行或尚未安装操作系统，请参考 [Simple-VGA-Simulator 手册附录](https://github.com/pikipity/Simple-VGA-Simulator/blob/main/Manual%20for%20EIE330%20Students.md#10-%E9%99%84%E5%BD%95--appendices)：Appendix A（准备工作）和 Appendix B（系统安装）。
+
+All students in this course use the **VirtualBox + Ubuntu** environment. Please ensure your virtual machine is running **Ubuntu 22.04 LTS** or **Ubuntu 24.04 LTS**.
+
+> If you are not familiar with Linux command line or have not installed the operating system yet, please refer to the [Simple-VGA-Simulator Manual Appendices](https://github.com/pikipity/Simple-VGA-Simulator/blob/main/Manual%20for%20EIE330%20Students.md#10-%E9%99%84%E5%BD%95--appendices): Appendix A (Prerequisites) and Appendix B (System Installation).
 
 ---
 
