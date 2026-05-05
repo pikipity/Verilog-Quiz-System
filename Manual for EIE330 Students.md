@@ -90,23 +90,25 @@ gtkwave --version
    - 找到最新版本（Latest）
 
 2. **下载对应版本** / **Download for your platform**
-   | 平台 / Platform | 下载文件 / Download File |
-   |---|---|
-   | Windows | `verilog-quiz-windows.zip` |
-   | Linux (Ubuntu) | `verilog-quiz-linux.zip` |
-   | macOS | `verilog-quiz-macos.zip` |
+
+   所有学生均在 VirtualBox + Ubuntu 环境中运行本程序，请根据你的宿主机系统选择对应的 Linux 版本：
+
+   | 宿主机系统 / Host OS | 虚拟机架构 / VM Architecture | 下载文件 / Download File |
+   |---|---|---|
+   | Windows | x64 (Intel/AMD) | `verilog-quiz-linux.zip` |
+   | macOS (Intel) | x64 (Intel) | `verilog-quiz-linux.zip` |
+   | macOS (M 系列芯片 / Apple Silicon) | ARM64 | `verilog-quiz-linux-arm64.zip` |
 
 3. **解压文件** / **Extract the zip**
-   - Windows：右键 zip 文件 → "解压全部" / Right-click → "Extract All"
-   - Linux/macOS：`unzip verilog-quiz-linux.zip`
+
+   在 Ubuntu 终端中执行：
+
+   ```bash
+   unzip verilog-quiz-linux.zip
+   ```
 
 4. **运行程序** / **Run the application**
 
-   **Windows：**
-   - 进入解压后的文件夹
-   - 双击 `verilog-quiz-system.exe` 运行
-
-   **Linux/macOS：**
    ```bash
    # 1. 打开终端，进入解压后的目录 / Open terminal, navigate to extracted directory
    cd ~/Downloads/verilog-quiz-linux
@@ -206,9 +208,7 @@ After completing all questions:
 
 3. 报告将保存到系统应用数据目录：
    - Report saved to system application data directory:
-   - Windows: `C:\Users\<用户名>\AppData\Local\Verilog-Quiz\reports\`
-   - Linux: `~/.local/share/verilog-quiz/reports/`
-   - macOS: `~/Library/Application Support/Verilog-Quiz/reports/`
+   - `~/.local/share/verilog-quiz/reports/`
 
 4. 点击 **"打开文件夹"** 查看报告
    - Click **"Open Folder"** to view report
