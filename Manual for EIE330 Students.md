@@ -55,59 +55,12 @@ Before using this application, you need to install the following software:
 
 ### 安装 Icarus Verilog / Installing Icarus Verilog
 
-#### Windows（使用 WSL）/ Windows (Using WSL)
-
-Windows 用户需要安装 **WSL + Ubuntu 22.04**，然后在 WSL 中安装 iverilog：
-
-```powershell
-# 1. 以管理员身份打开 PowerShell，安装 WSL / Open PowerShell as admin, install WSL
-wsl --install -d Ubuntu-22.04
-
-# 2. 重启电脑 / Restart computer
-
-# 3. 在 WSL 中安装 iverilog / Install iverilog in WSL
-wsl sudo apt-get update
-wsl sudo apt-get install -y iverilog
-```
-
-#### macOS / macOS
-
-使用 Homebrew 安装 / Install with Homebrew：
-
 ```bash
-# 1. 安装 Homebrew（如果未安装）/ Install Homebrew (if not installed)
-/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-
-# 2. 安装 iverilog / Install iverilog
-brew install icarus-verilog
-```
-
-#### Linux（Ubuntu 22.04+）/ Linux (Ubuntu 22.04+)
-
-```bash
-# 安装 iverilog / Install iverilog
 sudo apt-get update
 sudo apt-get install -y iverilog
 ```
 
 ### 安装 GTKWave / Installing GTKWave
-
-#### Windows（使用 WSL）/ Windows (Using WSL)
-
-在 WSL 中安装 GTKWave：
-
-```bash
-wsl sudo apt-get update
-wsl sudo apt-get install -y gtkwave
-```
-
-#### macOS / macOS
-
-```bash
-brew install gtkwave
-```
-
-#### Linux（Ubuntu 22.04+）/ Linux (Ubuntu 22.04+)
 
 ```bash
 sudo apt-get update
