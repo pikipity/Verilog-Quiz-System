@@ -10,7 +10,6 @@
 - [下载与运行 / Download and Run](#下载与运行--download-and-run)
 - [使用教程 / Usage Tutorial](#使用教程--usage-tutorial)
 - [故障排除 / Troubleshooting](#故障排除--troubleshooting)
-- [附录：Linux 基础 / Appendix: Linux Basics](#附录linux-基础--appendix-linux-basics)
 
 ---
 
@@ -26,15 +25,18 @@ This manual is designed for EIE330 course students, providing detailed instructi
 
 | 平台 / Platform | 支持状态 / Status | 推荐度 / Recommendation |
 |---|---|---|
-| Windows 10/11 | ✅ 完全支持 / Fully supported | ⭐⭐⭐ |
 | Ubuntu 22.04 LTS | ✅ 完全支持 / Fully supported | ⭐⭐⭐⭐⭐ |
-| macOS 15.0+ | ✅ 支持 / Supported | ⭐⭐⭐ |
+| Ubuntu 24.04 LTS | ✅ 完全支持 / Fully supported | ⭐⭐⭐⭐⭐ |
 
-**特别提醒 Linux 用户 / Special Note for Linux Users：**
+**特别提醒 / Special Note：**
 
-本课程强烈推荐使用 **Ubuntu 22.04 LTS** 作为开发环境。即使你是 Linux 初学者，也不用担心！本手册会详细介绍所有必要的 Linux 基础操作。
+本课程所有学生均使用 **VirtualBox + Ubuntu** 环境。请确保你的虚拟机系统为 **Ubuntu 22.04 LTS** 或 **Ubuntu 24.04 LTS**。
 
-We strongly recommend using **Ubuntu 22.04 LTS** as the development environment for this course. Don't worry if you're new to Linux! This manual will detail all necessary basic Linux operations.
+> 如果不熟悉 Linux 命令行或尚未安装操作系统，请参考 [Simple-VGA-Simulator 手册附录](https://github.com/pikipity/Simple-VGA-Simulator/blob/main/Manual%20for%20EIE330%20Students.md#10-%E9%99%84%E5%BD%95--appendices)：Appendix A（准备工作）和 Appendix B（系统安装）。
+
+All students in this course use the **VirtualBox + Ubuntu** environment. Please ensure your virtual machine is running **Ubuntu 22.04 LTS** or **Ubuntu 24.04 LTS**.
+
+> If you are not familiar with Linux command line or have not installed the operating system yet, please refer to the [Simple-VGA-Simulator Manual Appendices](https://github.com/pikipity/Simple-VGA-Simulator/blob/main/Manual%20for%20EIE330%20Students.md#10-%E9%99%84%E5%BD%95--appendices): Appendix A (Prerequisites) and Appendix B (System Installation).
 
 ---
 
@@ -53,59 +55,12 @@ Before using this application, you need to install the following software:
 
 ### 安装 Icarus Verilog / Installing Icarus Verilog
 
-#### Windows（使用 WSL）/ Windows (Using WSL)
-
-Windows 用户需要安装 **WSL + Ubuntu 22.04**，然后在 WSL 中安装 iverilog：
-
-```powershell
-# 1. 以管理员身份打开 PowerShell，安装 WSL / Open PowerShell as admin, install WSL
-wsl --install -d Ubuntu-22.04
-
-# 2. 重启电脑 / Restart computer
-
-# 3. 在 WSL 中安装 iverilog / Install iverilog in WSL
-wsl sudo apt-get update
-wsl sudo apt-get install -y iverilog
-```
-
-#### macOS / macOS
-
-使用 Homebrew 安装 / Install with Homebrew：
-
 ```bash
-# 1. 安装 Homebrew（如果未安装）/ Install Homebrew (if not installed)
-/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-
-# 2. 安装 iverilog / Install iverilog
-brew install icarus-verilog
-```
-
-#### Linux（Ubuntu 22.04+）/ Linux (Ubuntu 22.04+)
-
-```bash
-# 安装 iverilog / Install iverilog
 sudo apt-get update
 sudo apt-get install -y iverilog
 ```
 
 ### 安装 GTKWave / Installing GTKWave
-
-#### Windows（使用 WSL）/ Windows (Using WSL)
-
-在 WSL 中安装 GTKWave：
-
-```bash
-wsl sudo apt-get update
-wsl sudo apt-get install -y gtkwave
-```
-
-#### macOS / macOS
-
-```bash
-brew install gtkwave
-```
-
-#### Linux（Ubuntu 22.04+）/ Linux (Ubuntu 22.04+)
 
 ```bash
 sudo apt-get update
@@ -135,23 +90,25 @@ gtkwave --version
    - 找到最新版本（Latest）
 
 2. **下载对应版本** / **Download for your platform**
-   | 平台 / Platform | 下载文件 / Download File |
-   |---|---|
-   | Windows | `verilog-quiz-windows.zip` |
-   | Linux (Ubuntu) | `verilog-quiz-linux.zip` |
-   | macOS | `verilog-quiz-macos.zip` |
+
+   所有学生均在 VirtualBox + Ubuntu 环境中运行本程序，请根据你的宿主机系统选择对应的 Linux 版本：
+
+   | 宿主机系统 / Host OS | 虚拟机架构 / VM Architecture | 下载文件 / Download File |
+   |---|---|---|
+   | Windows | x64 (Intel/AMD) | `verilog-quiz-linux.zip` |
+   | macOS (Intel) | x64 (Intel) | `verilog-quiz-linux.zip` |
+   | macOS (M 系列芯片 / Apple Silicon) | ARM64 | `verilog-quiz-linux-arm64.zip` |
 
 3. **解压文件** / **Extract the zip**
-   - Windows：右键 zip 文件 → "解压全部" / Right-click → "Extract All"
-   - Linux/macOS：`unzip verilog-quiz-linux.zip`
+
+   在 Ubuntu 终端中执行：
+
+   ```bash
+   unzip verilog-quiz-linux.zip
+   ```
 
 4. **运行程序** / **Run the application**
 
-   **Windows：**
-   - 进入解压后的文件夹
-   - 双击 `verilog-quiz-system.exe` 运行
-
-   **Linux/macOS：**
    ```bash
    # 1. 打开终端，进入解压后的目录 / Open terminal, navigate to extracted directory
    cd ~/Downloads/verilog-quiz-linux
@@ -251,9 +208,7 @@ After completing all questions:
 
 3. 报告将保存到系统应用数据目录：
    - Report saved to system application data directory:
-   - Windows: `C:\Users\<用户名>\AppData\Local\Verilog-Quiz\reports\`
-   - Linux: `~/.local/share/verilog-quiz/reports/`
-   - macOS: `~/Library/Application Support/Verilog-Quiz/reports/`
+   - `~/.local/share/verilog-quiz/reports/`
 
 4. 点击 **"打开文件夹"** 查看报告
    - Click **"Open Folder"** to view report
@@ -361,85 +316,3 @@ If you encounter any issues during use, please:
 ---
 
 祝学习顺利！/ Happy learning!
-
----
-
-## 附录：Linux 基础 / Appendix: Linux Basics
-
-⚠️ **重要提示 / Important:** 即使你从未使用过 Linux，也不用担心！以下基础命令足以完成本课程的所有操作。
-
-Don't worry if you've never used Linux before! The following basic commands are sufficient for all operations in this course.
-
-### 什么是终端？/ What is a Terminal?
-
-终端（Terminal）是一个可以通过输入命令来控制电脑的程序。在 Windows 上你可能习惯使用图形界面点击操作，而在 Linux 中，很多操作通过输入命令更加高效。
-
-A terminal is a program that allows you to control your computer by typing commands. While you may be used to clicking through graphical interfaces on Windows, many operations are more efficient through command input in Linux.
-
-### 打开终端 / Opening a Terminal
-
-Ubuntu 中打开终端的三种方法 / Three ways to open a terminal in Ubuntu:
-
-- **快捷键 / Keyboard Shortcut:** 按 `Ctrl` + `Alt` + `T`
-- **应用程序菜单 / Applications Menu:** 点击左下角的"Show Applications"（九宫格图标），搜索 "terminal"
-- **右键菜单 / Right-click Menu:** 在桌面或文件夹空白处右键 → "Open in Terminal"
-
-打开终端后，你会看到一个提示符（prompt），通常长这样：
-
-After opening the terminal, you will see a prompt that typically looks like this:
-
-```
-username@computer-name:~$
-```
-
-- `username`: 你的用户名 / Your username
-- `computer-name`: 计算机名称 / Computer name
-- `~`: 当前所在目录（`~` 表示用户主目录 / home directory）
-- `$`: 表示普通用户权限 / Indicates normal user privileges
-
-### 必备命令 / Essential Commands
-
-| 命令 / Command | 全称 / Full Name | 功能 / Function | 示例 / Example |
-|---|---|---|---|
-| `pwd` | Print Working Directory | 显示当前所在路径 / Show current path | `pwd` |
-| `ls` | List | 列出当前目录的文件 / List files | `ls`, `ls -la` |
-| `cd` | Change Directory | 切换目录 / Change directory | `cd Documents`, `cd ..` |
-| `mkdir` | Make Directory | 创建新文件夹 / Create new folder | `mkdir my_project` |
-| `cp` | Copy | 复制文件 / Copy file | `cp file.txt backup.txt` |
-| `mv` | Move | 移动或重命名 / Move or rename | `mv old.txt new.txt` |
-| `rm` | Remove | 删除文件 / Delete file | `rm file.txt` |
-| `chmod` | Change Mode | 修改文件权限 / Change permissions | `chmod +x script.sh` |
-| `sudo` | Superuser Do | 以管理员权限执行 / Execute as admin | `sudo apt update` |
-
-### 命令详解 / Detailed Command Usage
-
-```bash
-# 1. pwd - 查看我在哪里 / See where you are
-$ pwd
-/home/username/Documents
-
-# 2. ls - 查看周围有什么 / See what's around
-$ ls                    # 简单列表 / Simple list
-$ ls -l                 # 详细列表 / Detailed list
-$ ls -la                # 详细+隐藏文件 / Detailed + hidden
-
-# 3. cd - 移动到另一个文件夹 / Move to another folder
-$ cd Documents          # 进入 Documents / Enter Documents
-$ cd ..                 # 返回上一级 / Go to parent
-$ cd ~                  # 返回主目录 / Go to home
-
-# 4. mkdir - 创建文件夹 / Create folder
-$ mkdir MyProject       # 创建 MyProject 文件夹
-
-# 5. cp - 复制 / Copy
-$ cp file.txt backup.txt    # 复制文件
-$ cp -r folder1 folder2     # 复制整个文件夹
-
-# 6. mv - 移动或重命名 / Move or rename
-$ mv old.txt new.txt    # 重命名 / Rename
-
-# 7. chmod - 修改权限 / Change permissions
-$ chmod +x program      # 添加执行权限 / Add execute permission
-```
-
-💡 **提示 / Tip:** 使用 `Tab` 键可以自动补全文件名，避免输入错误！
