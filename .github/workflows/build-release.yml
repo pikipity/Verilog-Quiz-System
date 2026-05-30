@@ -100,17 +100,66 @@ jobs:
         if: matrix.target != 'windows'
         run: |
           python -c "
-          import os, re, flet
-          version_py = os.path.join(os.path.dirname(flet.__file__), 'version.py')
+          import os, re, flet, shutil
+          
+          flet_dir = os.path.dirname(flet.__file__)
+          version_py = os.path.join(flet_dir, 'version.py')
+          
+          # 删除 Python 字节码缓存，确保修改后重新导入生效
+          for root, dirs, files in os.walk(flet_dir):
+              for d in list(dirs):
+                  if d == '__pycache__':
+                      shutil.rmtree(os.path.join(root, d))
+                      dirs.remove(d)
+              for f in files:
+                  if f.endswith('.pyc'):
+                      os.remove(os.path.join(root, f))
+          
+          print('version.py path:', version_py)
+          
           with open(version_py, 'r') as f:
               content = f.read()
-          # 将 flutter_version = 'xxx' 替换为实际安装的版本（支持单双引号）
-          content = re.sub(r'flutter_version\s*=\s*[\"\'][^\"\']*[\"\']', f'flutter_version = \"{os.environ[\"FLUTTER_VERSION\"]}\"', content)
+          
+          print('Lines containing flutter_version:')
+          for i, line in enumerate(content.split('\n')):
+              if 'flutter_version' in line:
+                  print(f'  Line {i+1}: {repr(line)}')
+          
+          # 尝试正则替换
+          new_content = re.sub(r'flutter_version\s*=\s*[\"\'][^\"\']*[\"\']', f'flutter_version = \"{os.environ[\"FLUTTER_VERSION\"]}\"', content)
+          
+          # 如果正则无匹配，使用行级替换兜底
+          if new_content == content:
+              print('Regex did not match, trying line-by-line fallback...')
+              lines = content.split('\n')
+              new_lines = []
+              for line in lines:
+                  stripped = line.strip()
+                  if stripped.startswith('flutter_version') and '=' in stripped and not stripped.startswith('def ') and not stripped.startswith('#'):
+                      indent = line[:len(line) - len(line.lstrip())]
+                      line = indent + f'flutter_version = \"{os.environ[\"FLUTTER_VERSION\"]}\"'
+                      print(f'  Replaced: {line}')
+                  new_lines.append(line)
+              new_content = '\n'.join(new_lines)
+          
           with open(version_py, 'w') as f:
-              f.write(content)
+              f.write(new_content)
+          
           print('Patched', version_py)
           "
-          python -c "import flet.version; print('flet flutter_version:', flet.version.flutter_version)"
+          # 强制重新加载模块确认修改生效
+          python -c "
+          import importlib, flet.version
+          importlib.reload(flet.version)
+          print('flet flutter_version after patch:', flet.version.flutter_version)
+          "
+          # 同时验证 flet_cli 读到的值
+          python -c "
+          import flet.version
+          print('flet.version.flutter_version =', flet.version.flutter_version)
+          "
+          # 确保环境变量也设置了（供 flet build 内部可能用到）
+          echo "FLET_FLUTTER_VERSION=$FLUTTER_VERSION" >> "$GITHUB_ENV"
 
       # ========== 7. 用 flet build 打包 ==========
       - name: Build with flet (Windows)
