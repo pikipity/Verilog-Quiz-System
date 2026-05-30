@@ -149,7 +149,7 @@ jobs:
           du -sh "$PLATFORM_DIR" || true
           echo "---"
           echo "Top 20 largest files/directories:"
-          du -ah "$PLATFORM_DIR" | sort -rh | head -20
+          du -ah "$PLATFORM_DIR" 2>/dev/null | sort -rh 2>/dev/null | head -20 || true
           echo "---"
 
           # ========== 清理不需要的 Flutter SDK 开发文件 ==========
