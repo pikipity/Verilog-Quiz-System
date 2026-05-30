@@ -152,6 +152,9 @@ jobs:
           echo "Original size before cleanup:"
           du -sh "$PLATFORM_DIR" || true
           echo "---"
+          echo "Top 20 largest files/directories:"
+          du -ah "$PLATFORM_DIR" | sort -rh | head -20
+          echo "---"
 
           # ========== 清理不需要的 Flutter SDK 开发文件 ==========
           # 这些文件被 flet build 带入输出目录，运行时完全不需要，
@@ -199,6 +202,16 @@ jobs:
           find "$PLATFORM_DIR" -type f -name "*.stamp" -delete 2>/dev/null || true
           find "$PLATFORM_DIR" -type f -name "*.d" -delete 2>/dev/null || true
 
+          # macOS 特定清理（dSYM 调试符号通常非常大）
+          if [ "${{ matrix.target }}" = "macos" ] || [ "${{ matrix.target }}" = "macos-intel" ]; then
+            echo "Running macOS-specific cleanup..."
+            find "$PLATFORM_DIR" -type d -name "*.dSYM" -exec rm -rf {} + 2>/dev/null || true
+            find "$PLATFORM_DIR" -type d -name "Headers" -exec rm -rf {} + 2>/dev/null || true
+            find "$PLATFORM_DIR" -type d -name "PrivateHeaders" -exec rm -rf {} + 2>/dev/null || true
+            find "$PLATFORM_DIR" -type d -name "Modules" -exec rm -rf {} + 2>/dev/null || true
+            echo "macOS cleanup done"
+          fi
+
           echo "Size after cleanup:"
           du -sh "$PLATFORM_DIR" || true
           echo "---"
@@ -212,26 +225,52 @@ jobs:
             # Windows: Python 打包整个 dist/ 目录
             python -c "import shutil; shutil.make_archive('release/verilog-quiz-${{ matrix.target }}', 'zip', '$PLATFORM_DIR')"
           elif [ "${{ matrix.target }}" = "macos" ] || [ "${{ matrix.target }}" = "macos-intel" ]; then
-            # macOS: 只打包 .app bundle，不打包 dist/ 下的其他文件
-            APP_BUNDLE=$(find "$PLATFORM_DIR" -maxdepth 1 -name "*.app" -type d | head -1)
+            # macOS: 查找 .app bundle（可能在 dist/ 或 dist/macos/ 下），只打包它
+            APP_BUNDLE=$(find "$PLATFORM_DIR" -maxdepth 3 -name "*.app" -type d | head -1)
             if [ -n "$APP_BUNDLE" ]; then
-              (cd "$PLATFORM_DIR" && zip -r "$(pwd)/../release/$ZIP_NAME" "$(basename "$APP_BUNDLE")")
+              BUNDLE_NAME=$(basename "$APP_BUNDLE")
+              BUNDLE_DIR=$(dirname "$APP_BUNDLE")
+              echo "Found macOS app bundle: $APP_BUNDLE"
+              (cd "$BUNDLE_DIR" && zip -r "$(pwd)/../../release/$ZIP_NAME" "$BUNDLE_NAME")
             else
+              echo "WARNING: No .app bundle found, falling back to full directory zip"
               (cd "$PLATFORM_DIR" && zip -r "$(pwd)/../release/$ZIP_NAME" .)
             fi
           else
             # Linux: 用 zip 命令保留 Unix 权限
             (cd "$PLATFORM_DIR" && zip -r "$(pwd)/../release/$ZIP_NAME" .)
           fi
-          echo "Created: release/$ZIP_NAME"
+          
+          ZIP_SIZE=$(stat -f%z "release/$ZIP_NAME" 2>/dev/null || stat -c%s "release/$ZIP_NAME" 2>/dev/null || echo "0")
+          echo "Created: release/$ZIP_NAME (${ZIP_SIZE} bytes)"
           ls -lh release/
+          
+          # 如果 zip 超过 2GB，使用分卷压缩以适配 upload-artifact
+          if [ "$ZIP_SIZE" -gt 2147483648 ]; then
+            echo "WARNING: ZIP exceeds 2GB ($ZIP_SIZE bytes), splitting into volumes..."
+            rm "release/$ZIP_NAME"
+            if [ "${{ matrix.target }}" = "macos" ] || [ "${{ matrix.target }}" = "macos-intel" ]; then
+              APP_BUNDLE=$(find "$PLATFORM_DIR" -maxdepth 3 -name "*.app" -type d | head -1)
+              if [ -n "$APP_BUNDLE" ]; then
+                BUNDLE_NAME=$(basename "$APP_BUNDLE")
+                BUNDLE_DIR=$(dirname "$APP_BUNDLE")
+                (cd "$BUNDLE_DIR" && zip -r -s 1000m "$(pwd)/../../release/$ZIP_NAME" "$BUNDLE_NAME")
+              else
+                (cd "$PLATFORM_DIR" && zip -r -s 1000m "$(pwd)/../release/$ZIP_NAME" .)
+              fi
+            else
+              (cd "$PLATFORM_DIR" && zip -r -s 1000m "$(pwd)/../release/$ZIP_NAME" .)
+            fi
+            echo "Split archives:"
+            ls -lh release/
+          fi
 
       # ========== 9. 上传构建产物 ==========
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: verilog-quiz-${{ matrix.target }}
-          path: release/*.zip
+          path: release/*
           retention-days: 30
 
       # ========== 10. 创建 Release ==========
