@@ -263,6 +263,68 @@ jobs:
           echo "Files remaining in $PLATFORM_DIR:"
           ls -la "$PLATFORM_DIR"
 
+          # ========== Linux VM 兼容 wrapper 脚本 ==========
+          # Flutter Linux embedder 在 VirtualBox 等 VM 的 GPU 虚拟化环境中
+          # 可能因 OpenGL 驱动问题导致白屏。wrapper 脚本检测 VM 并强制软件渲染。
+          if [ "${{ matrix.target }}" = "linux" ] || [ "${{ matrix.target }}" = "linux-arm64" ]; then
+            echo "Creating VM-compatible wrapper script for Linux..."
+            cd "$PLATFORM_DIR"
+            # 查找主可执行文件（排除 .so 和脚本，找到 ELF 二进制文件）
+            FOUND_EXE=""
+            for f in *; do
+              if [ -f "$f" ] && [ -x "$f" ] && file "$f" | grep -q "ELF.*executable"; then
+                FOUND_EXE="$f"
+                break
+              fi
+            done
+            if [ -n "$FOUND_EXE" ]; then
+              echo "Found executable: $FOUND_EXE"
+              mv "$FOUND_EXE" "${FOUND_EXE}.bin"
+              cat > "$FOUND_EXE" << 'WRAPPER_EOF'
+#!/bin/bash
+# Verilog Quiz System - VM-compatible launcher
+# Auto-detects VM environment and forces software rendering when needed
+
+IS_VM=false
+
+# Detect VM via CPU flags
+if [ -f /proc/cpuinfo ] && grep -qiE "hypervisor|qemu|kvm|vmware" /proc/cpuinfo 2>/dev/null; then
+  IS_VM=true
+fi
+
+# Detect VM via DMI
+if [ -f /sys/class/dmi/id/product_name ] && grep -qiE "virtualbox|vmware|kvm|qemu|bochs" /sys/class/dmi/id/product_name 2>/dev/null; then
+  IS_VM=true
+fi
+
+# Detect VM via systemd-detect-virt
+if command -v systemd-detect-virt >/dev/null 2>&1; then
+  VIRT=$(systemd-detect-virt 2>/dev/null)
+  if [ -n "$VIRT" ] && [ "$VIRT" != "none" ]; then
+    IS_VM=true
+  fi
+fi
+
+# Force software rendering in VM or when no GPU available
+if [ "$IS_VM" = "true" ] || [ ! -d /dev/dri ]; then
+  export LIBGL_ALWAYS_SOFTWARE=1
+  export GALLIUM_DRIVER=llvmpipe
+  export MESA_LOADER_DRIVER_OVERRIDE=llvmpipe
+  export MESA_GLTHREAD=false
+  export GDK_BACKEND=x11
+fi
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+exec "$SCRIPT_DIR/$(basename "$0").bin" "$@"
+WRAPPER_EOF
+              chmod +x "$FOUND_EXE"
+              echo "Wrapper script created for: $FOUND_EXE"
+            else
+              echo "WARNING: Could not find main ELF executable for wrapper"
+            fi
+            cd - >/dev/null
+          fi
+
           # ========== 打包 ==========
           mkdir -p release
           ZIP_NAME="verilog-quiz-${{ matrix.target }}.zip"

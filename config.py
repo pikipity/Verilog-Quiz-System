@@ -14,9 +14,13 @@ def get_app_data_dir():
     # Detect if running in a packaged/bundled application.
     # 1. PyInstaller sets sys.frozen = True
     # 2. flet build uses serious_python and does NOT set sys.frozen,
-    #    but sys.argv[0] is the app binary (not a .py script)
+    #    but sets FLET_APP_STORAGE_DATA environment variable
+    # 3. sys.argv[0] may be the app binary or the .py script depending on launcher
     is_packaged = False
     if getattr(sys, 'frozen', False):
+        is_packaged = True
+    elif os.environ.get('FLET_APP_STORAGE_DATA'):
+        # flet build sets this env var
         is_packaged = True
     elif sys.argv:
         argv0 = sys.argv[0]

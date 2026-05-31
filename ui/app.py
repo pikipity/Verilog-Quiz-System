@@ -46,9 +46,29 @@ class VerilogQuizApp:
     
     def show_week_selector(self):
         """Show week selector"""
-        self.page.clean()
-        self.page.add(self.week_selector.build())
-        self.page.update()
+        print(f"[DEBUG] show_week_selector called")
+        try:
+            # 使用 controls.clear() 替代 page.clean()，避免触发 FlutterEngineRemoveView
+            # 在 VirtualBox 等 VM 环境中，page.clean() 可能导致 implicit view 移除错误
+            self.page.controls.clear()
+            print(f"[DEBUG] controls cleared, building week_selector...")
+            content = self.week_selector.build()
+            print(f"[DEBUG] week_selector.build() returned, type={type(content)}")
+            self.page.add(content)
+            print(f"[DEBUG] content added to page")
+            self.page.update()
+            print(f"[DEBUG] page.update() called")
+        except Exception as e:
+            print(f"[ERROR] show_week_selector failed: {e}")
+            import traceback
+            traceback.print_exc()
+            # 降级处理：直接替换 controls 列表
+            try:
+                self.page.controls = [self.week_selector.build()]
+                self.page.update()
+            except Exception as e2:
+                print(f"[ERROR] Fallback also failed: {e2}")
+                traceback.print_exc()
     
     def show_question_view(self, week: int, question_index: int = 0):
         """
@@ -61,9 +81,23 @@ class VerilogQuizApp:
         self.current_week = week
         self.current_question_index = question_index
         
-        self.page.clean()
-        self.page.add(self.question_view.build(week, question_index))
-        self.page.update()
+        print(f"[DEBUG] show_question_view called: week={week}, index={question_index}")
+        try:
+            self.page.controls.clear()
+            content = self.question_view.build(week, question_index)
+            self.page.add(content)
+            self.page.update()
+            print(f"[DEBUG] show_question_view completed")
+        except Exception as e:
+            print(f"[ERROR] show_question_view failed: {e}")
+            import traceback
+            traceback.print_exc()
+            try:
+                self.page.controls = [self.question_view.build(week, question_index)]
+                self.page.update()
+            except Exception as e2:
+                print(f"[ERROR] Fallback also failed: {e2}")
+                traceback.print_exc()
     
     def navigate_to_question(self, question_index: int):
         """Navigate to specified question"""
@@ -72,11 +106,14 @@ class VerilogQuizApp:
     
     def show_snackbar(self, message: str, color=ft.Colors.BLUE, duration=None):
         """Show snackbar"""
-        snack = ft.SnackBar(
-            content=ft.Text(message),
-            bgcolor=color,
-            duration=duration,
-        )
-        self.page.overlay.append(snack)
-        snack.open = True
-        self.page.update()
+        try:
+            snack = ft.SnackBar(
+                content=ft.Text(message),
+                bgcolor=color,
+                duration=duration,
+            )
+            self.page.overlay.append(snack)
+            snack.open = True
+            self.page.update()
+        except Exception as e:
+            print(f"[Error] show_snackbar failed: {e}")

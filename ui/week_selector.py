@@ -21,19 +21,42 @@ class WeekSelector:
     
     def build(self) -> ft.Control:
         """Build interface"""
+        print(f"[DEBUG] WeekSelector.build() started")
         self._load_weeks_data()
+        print(f"[DEBUG] Loaded {len(self.weeks_data)} weeks")
         
-        return ft.Column(
-            [
-                self._build_header(),
-                ft.Divider(),
-                self._build_weeks_list(),
-                ft.Divider(),
-                self._build_footer(),
-            ],
-            expand=True,
-            scroll=ft.ScrollMode.AUTO,
-        )
+        try:
+            header = self._build_header()
+            print(f"[DEBUG] Header built OK")
+            
+            weeks_list = self._build_weeks_list()
+            print(f"[DEBUG] Weeks list built OK")
+            
+            footer = self._build_footer()
+            print(f"[DEBUG] Footer built OK")
+            
+            result = ft.Column(
+                [
+                    header,
+                    ft.Divider(),
+                    weeks_list,
+                    ft.Divider(),
+                    footer,
+                ],
+                expand=True,
+                scroll=ft.ScrollMode.AUTO,
+            )
+            print(f"[DEBUG] WeekSelector.build() completed successfully")
+            return result
+        except Exception as e:
+            print(f"[ERROR] WeekSelector.build() failed: {e}")
+            import traceback
+            traceback.print_exc()
+            # 返回一个错误提示界面，避免白屏
+            return ft.Column([
+                ft.Text(f"UI Error: {e}", color=ft.Colors.RED, size=16),
+                ft.ElevatedButton("Reload", on_click=lambda e: self.app.show_week_selector()),
+            ])
     
     def _build_header(self) -> ft.Control:
         """Build header"""
@@ -61,7 +84,10 @@ class WeekSelector:
     
     def _build_weeks_list(self) -> ft.Control:
         """Build weeks list"""
+        print(f"[DEBUG] _build_weeks_list: weeks_data has {len(self.weeks_data)} items")
+        
         if not self.weeks_data:
+            print(f"[DEBUG] _build_weeks_list: returning empty state")
             return ft.Container(
                 content=ft.Column(
                     [
@@ -77,102 +103,87 @@ class WeekSelector:
             )
         
         week_cards = []
-        for week_info in self.weeks_data:
-            card = self._build_week_card(week_info)
-            week_cards.append(card)
-            week_cards.append(ft.Container(height=10))
+        for i, week_info in enumerate(self.weeks_data):
+            print(f"[DEBUG] _build_weeks_list: building card {i+1}/{len(self.weeks_data)}")
+            try:
+                card = self._build_week_card(week_info)
+                week_cards.append(card)
+                week_cards.append(ft.Container(height=10))
+                print(f"[DEBUG] _build_weeks_list: card {i+1} appended")
+            except Exception as e:
+                print(f"[ERROR] _build_weeks_list: card {i+1} failed: {e}")
+                week_cards.append(ft.Text(f"Error loading week card: {e}", color=ft.Colors.RED))
         
-        return ft.Container(
-            content=ft.Column(week_cards, scroll=ft.ScrollMode.AUTO),
-            padding=ft.padding.symmetric(horizontal=20),
-            expand=True,
-        )
+        print(f"[DEBUG] _build_weeks_list: creating Column with {len(week_cards)} items")
+        try:
+            result = ft.Container(
+                content=ft.Column(week_cards, scroll=ft.ScrollMode.AUTO),
+                padding=ft.padding.symmetric(horizontal=20),
+                expand=True,
+            )
+            print(f"[DEBUG] _build_weeks_list: Column created OK")
+            return result
+        except Exception as e:
+            print(f"[ERROR] _build_weeks_list: Column creation failed: {e}")
+            import traceback
+            traceback.print_exc()
+            return ft.Text(f"List Error: {e}", color=ft.Colors.RED)
     
     def _build_week_card(self, week_info: dict) -> ft.Control:
-        """Build single week card"""
-        week = week_info["week"]
-        title = week_info.get("title", f"Week {week}")
-        
-        # Check progress for this week
-        progress = self._get_week_progress(week)
-        completed = progress["completed"]
-        total = progress["total"]
-        
-        # Determine status
-        is_completed = completed >= total and total > 0
-        is_in_progress = completed > 0 and not is_completed
-        
-        # Status colors and icons (not started status not shown)
-        if is_completed:
-            status_color = ft.Colors.GREEN
-            status_icon = ft.Icons.CHECK_CIRCLE
-            status_text = f"Completed {completed}/{total}"
-            action_text = "Redo"
-        elif is_in_progress:
-            status_color = ft.Colors.ORANGE
-            status_icon = ft.Icons.PENDING_ACTIONS
-            status_text = f"In Progress {completed}/{total}"
-            action_text = "Continue"
-        else:
-            status_color = ft.Colors.BLUE
-            status_icon = ft.Icons.RADIO_BUTTON_OFF
-            status_text = f"Not Started 0/{total}"  # Show not started status
-            action_text = "Start"
-        
-        # Build left info column
-        left_column_items = [
-            ft.Text(
-                f"Week {week}: {title}",
-                size=20,
-                weight=ft.FontWeight.BOLD,
-            ),
-        ]
-        
-        # Only show status row for non-not-started states
-        if status_text:
-            left_column_items.append(
-                ft.Row(
-                    [
-                        ft.Icon(status_icon, color=status_color, size=20),
-                        ft.Text(
-                            status_text,
-                            size=14,
-                            color=status_color,
-                            weight=ft.FontWeight.W_500,
-                        ),
-                    ],
-                    spacing=5,
-                ),
-            )
-        
-        return ft.Card(
-            content=ft.Container(
-                content=ft.Row(
-                    [
-                        # Left: Week info
-                        ft.Column(
-                            left_column_items,
-                            spacing=8,
-                            expand=True,
-                        ),
-                        # Right: Action button
-                        ft.ElevatedButton(
-                            action_text,
-                            icon=ft.Icons.PLAY_ARROW if action_text != "Redo" else ft.Icons.REFRESH,
-                            on_click=lambda e, w=week: self._on_week_click(w),
-                            style=ft.ButtonStyle(
-                                color=ft.Colors.WHITE,
-                                bgcolor=status_color,
-                            ),
-                        ),
-                    ],
-                    alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
-                    vertical_alignment=ft.CrossAxisAlignment.CENTER,
+        """Build single week card (minimal version for ARM64 VM compatibility test)"""
+        try:
+            print(f"[DEBUG] _build_week_card: week_info={week_info}")
+            
+            week = week_info["week"]
+            title = week_info.get("title", f"Week {week}")
+            
+            # Check progress for this week
+            progress = self._get_week_progress(week)
+            completed = progress["completed"]
+            total = progress["total"]
+            
+            # Determine status text
+            if completed >= total and total > 0:
+                status_text = f"Completed {completed}/{total}"
+                action_text = "Redo"
+            elif completed > 0:
+                status_text = f"In Progress {completed}/{total}"
+                action_text = "Continue"
+            else:
+                status_text = f"Not Started 0/{total}"
+                action_text = "Start"
+            
+            print(f"[DEBUG] _build_week_card: creating MINIMAL card for week={week}")
+            
+            # MINIMAL VERSION: Only use ft.Text and ft.Container
+            # This avoids all potentially problematic widgets on ARM64:
+            # - ft.Card (elevation/shadows)
+            # - ft.ElevatedButton / ft.FilledButton (Material 3, complex rendering)
+            # - ft.Icon (icon font loading)
+            # - ft.Row with expand=True (layout calculation)
+            # - ft.ButtonStyle
+            card = ft.Container(
+                content=ft.Text(
+                    f"Week {week}: {title}  |  {status_text}  |  [{action_text}]",
+                    size=16,
                 ),
                 padding=20,
-            ),
-            elevation=2,
-        )
+                bgcolor=ft.Colors.WHITE,
+                border=ft.border.all(1, ft.Colors.GREY_300),
+                border_radius=8,
+                on_click=lambda e, w=week: self._on_week_click(w),
+            )
+            print(f"[DEBUG] _build_week_card: minimal card created OK")
+            return card
+        except Exception as e:
+            print(f"[ERROR] _build_week_card failed for week_info={week_info}: {e}")
+            import traceback
+            traceback.print_exc()
+            return ft.Container(
+                content=ft.Text(f"Card Error: {e}", color=ft.Colors.RED),
+                padding=20,
+                border=ft.border.all(1, ft.Colors.RED),
+            )
     
     def _build_footer(self) -> ft.Control:
         """Build footer"""
