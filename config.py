@@ -10,53 +10,32 @@ APP_NAME = "Verilog Quiz System"
 
 
 def get_app_data_dir():
-    """Get application data directory"""
-    # Detect if running in a packaged/bundled application.
-    # 1. PyInstaller sets sys.frozen = True
-    # 2. flet build uses serious_python and does NOT set sys.frozen,
-    #    but sets FLET_APP_STORAGE_DATA environment variable
-    # 3. sys.argv[0] may be the app binary or the .py script depending on launcher
-    is_packaged = False
+    """Get application data directory (use fixed location after packaging)"""
+    # Detect if in PyInstaller packaged environment
     if getattr(sys, 'frozen', False):
-        is_packaged = True
-    elif os.environ.get('FLET_APP_STORAGE_DATA'):
-        # flet build sets this env var
-        is_packaged = True
-    elif sys.argv:
-        argv0 = sys.argv[0]
-        if argv0 and not argv0.endswith(('.py', '.pyc', '.pyo')):
-            is_packaged = True
-    
-    if is_packaged:
-        # Packaged program: use standard OS-specific user data directory
+        # Packaged program
         if sys.platform == 'win32':
             # Windows: C:\Users\<User>\AppData\Local\Verilog-Quiz
             base_dir = os.path.join(os.environ['LOCALAPPDATA'], 'Verilog-Quiz')
         elif sys.platform == 'darwin':
             # macOS: ~/Library/Application Support/Verilog-Quiz
             base_dir = os.path.join(
-                os.path.expanduser('~'),
-                'Library',
-                'Application Support',
+                os.path.expanduser('~'), 
+                'Library', 
+                'Application Support', 
                 'Verilog-Quiz'
             )
         else:
-            # Linux: follow XDG Base Directory spec
-            xdg_data_home = os.environ.get('XDG_DATA_HOME')
-            if xdg_data_home:
-                base_dir = os.path.join(xdg_data_home, 'verilog-quiz')
-            else:
-                base_dir = os.path.join(
-                    os.path.expanduser('~'),
-                    '.local',
-                    'share',
-                    'verilog-quiz'
-                )
+            # Linux: ~/.local/share/verilog-quiz
+            base_dir = os.path.join(
+                os.path.expanduser('~'), 
+                '.local', 
+                'share', 
+                'verilog-quiz'
+            )
     else:
-        # Development environment: use a dedicated subdir inside project
-        # to avoid mixing data files with source code
-        project_dir = os.path.dirname(os.path.abspath(__file__))
-        base_dir = os.path.join(project_dir, '.data')
+        # Development environment: use current directory
+        base_dir = os.path.dirname(os.path.abspath(__file__))
     
     return base_dir
 

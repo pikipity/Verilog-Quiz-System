@@ -116,12 +116,12 @@ class QuestionView:
                             size=11,
                             color=ft.Colors.GREY,
                         ),
-                        padding=ft.Padding(right=10),
+                        padding=ft.padding.only(right=10),
                     ),
                 ],
                 alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
             ),
-            padding=ft.Padding(left=10, right=10, top=5, bottom=5),
+            padding=ft.padding.symmetric(horizontal=10, vertical=5),
         )
     
     def _build_question_selector(self) -> ft.Control:
@@ -170,7 +170,7 @@ class QuestionView:
                 ),
                 style=ft.ButtonStyle(
                     bgcolor=bg_color,
-                    padding=ft.Padding(left=12, right=12, top=8, bottom=8),
+                    padding=ft.padding.symmetric(horizontal=12, vertical=8),
                 ),
                 on_click=lambda e, idx=i: self._on_question_select(idx),
                 disabled=is_current,  # 当前题目禁用点击
@@ -278,7 +278,7 @@ class QuestionView:
             read_only=True,
             bgcolor=ft.Colors.GREY_100,
             width=50,
-            content_padding=ft.Padding(left=8, right=4, top=12, bottom=12),
+            content_padding=ft.padding.only(left=8, right=4, top=12, bottom=12),
         )
         
         # 代码编辑器
@@ -296,7 +296,7 @@ class QuestionView:
             on_change=self._on_code_change_with_line_numbers,
             on_blur=on_blur_save,  # Auto-save when focus is lost
             expand=True,
-            content_padding=ft.Padding(left=8, top=12, bottom=12),
+            content_padding=ft.padding.only(left=8, top=12, bottom=12),
         )
         
         return ft.Container(
@@ -342,7 +342,7 @@ class QuestionView:
             read_only=True,
             bgcolor=ft.Colors.GREY_100,
             width=50,
-            content_padding=ft.Padding(left=8, right=4, top=12, bottom=12),
+            content_padding=ft.padding.only(left=8, right=4, top=12, bottom=12),
         )
         
         # Testbench code display
@@ -359,7 +359,7 @@ class QuestionView:
             read_only=True,
             bgcolor=ft.Colors.GREY_50,
             expand=True,
-            content_padding=ft.Padding(left=8, top=12, bottom=12),
+            content_padding=ft.padding.only(left=8, top=12, bottom=12),
         )
         
         return ft.Container(
