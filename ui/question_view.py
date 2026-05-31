@@ -121,7 +121,7 @@ class QuestionView:
                 ],
                 alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
             ),
-            padding=ft.padding.symmetric(horizontal=10, vertical=5),
+            padding=ft.padding.only(left=10, right=10, top=5, bottom=5),
         )
     
     def _build_question_selector(self) -> ft.Control:
@@ -170,7 +170,7 @@ class QuestionView:
                 ),
                 style=ft.ButtonStyle(
                     bgcolor=bg_color,
-                    padding=ft.padding.symmetric(horizontal=12, vertical=8),
+                    padding=ft.padding.only(left=12, right=12, top=8, bottom=8),
                 ),
                 on_click=lambda e, idx=i: self._on_question_select(idx),
                 disabled=is_current,  # 当前题目禁用点击

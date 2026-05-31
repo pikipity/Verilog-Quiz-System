@@ -118,7 +118,7 @@ class WeekSelector:
         try:
             result = ft.Container(
                 content=ft.Column(week_cards, scroll=ft.ScrollMode.AUTO),
-                padding=ft.padding.symmetric(horizontal=20),
+                padding=ft.padding.only(left=20, right=20),
                 expand=True,
             )
             print(f"[DEBUG] _build_weeks_list: Column created OK")
