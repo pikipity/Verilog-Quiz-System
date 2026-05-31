@@ -280,7 +280,7 @@ jobs:
             if [ -n "$FOUND_EXE" ]; then
               echo "Found executable: $FOUND_EXE"
               mv "$FOUND_EXE" "${FOUND_EXE}.bin"
-              cat > "$FOUND_EXE" << 'WRAPPER_EOF'
+              cat > "$FOUND_EXE" <<'WRAPPER_EOF'
 #!/bin/bash
 # Verilog Quiz System - VM-compatible launcher
 # Auto-detects VM environment and forces software rendering when needed
