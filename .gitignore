@@ -40,7 +40,6 @@ env/
 *~
 
 # Project specific
-.data/
 questions/*/
 !questions/.gitkeep
 submissions/*/

@@ -1,7 +1,12 @@
 name: Build Dev
 
-# 只允许手动触发，用于测试打包流程
+# 触发条件：除 main 分支外的其他分支 push
 on:
+  push:
+    branches-ignore:
+      - main
+
+  # 允许手动触发
   workflow_dispatch:
 
 # 使用 Node.js 24（消除 deprecation 警告）
