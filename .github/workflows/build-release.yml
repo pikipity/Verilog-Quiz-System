@@ -168,19 +168,12 @@ jobs:
             cp assets/icon.png "$PLATFORM_DIR/verilog-quiz-system.png"
             echo "Copied icon to $PLATFORM_DIR/verilog-quiz-system.png"
           fi
-          printf '%s\n' \
-            '[Desktop Entry]' \
-            'Version=1.0' \
-            'Name=Verilog Quiz System' \
-            'Comment=Verilog Assignment and Exam System' \
-            'Exec=verilog-quiz-system' \
-            'Icon=verilog-quiz-system' \
-            'Terminal=false' \
-            'Type=Application' \
-            'Categories=Education;Development;' \
-            > "$PLATFORM_DIR/verilog-quiz-system.desktop"
+          # Copy install.sh and .desktop from repo
+          cp scripts/install.sh "$PLATFORM_DIR/install.sh"
+          cp scripts/verilog-quiz-system.desktop "$PLATFORM_DIR/verilog-quiz-system.desktop"
+          chmod +x "$PLATFORM_DIR/install.sh"
           chmod +x "$PLATFORM_DIR/verilog-quiz-system.desktop"
-          echo "Created .desktop file"
+          echo "Copied install.sh and .desktop"
 
           # ========== 打包 ==========
           mkdir -p release
@@ -245,16 +238,19 @@ jobs:
             ### 下载说明
             1. 下载对应平台的 **zip 文件**
             2. 解压到任意目录
-            3. 运行解压后的程序：`./verilog-quiz-system`
+            3. 运行安装脚本：`./install.sh`
+            4. 从应用菜单启动 "Verilog Quiz System"
+            5. 或直接运行：`./verilog-quiz-system`
 
             ### 下载文件
             | 文件 | 平台 | 架构 | 说明 |
             |------|------|------|------|
-            | `verilog-quiz-linux.zip` | Ubuntu 22.04+ | x64 | 解压后赋予执行权限并运行 |
-            | `verilog-quiz-linux-arm64.zip` | Ubuntu 24.04+ | ARM64 | 解压后赋予执行权限并运行 |
+            | `verilog-quiz-linux.zip` | Ubuntu 22.04+ | x64 | 解压后运行 install.sh 安装，或直接用命令行启动 |
+            | `verilog-quiz-linux-arm64.zip` | Ubuntu 24.04+ | ARM64 | 解压后运行 install.sh 安装，或直接用命令行启动 |
 
             ### 系统要求
             - **Linux**: Ubuntu 22.04+ (x64) / Ubuntu 24.04+ (ARM64)，需预装 iverilog 和 GTKWave
+            - **图标显示**: 直接双击 `.desktop` 文件可能无法启动（系统安全限制），请先运行 `./install.sh` 安装到应用菜单
           files: release/*.zip
           draft: false
           prerelease: false
