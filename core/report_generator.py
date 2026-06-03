@@ -174,36 +174,6 @@ class ReportGenerator:
                 return json.load(f)
         return None
     
-    def _format_result_table(self, result: Dict) -> str:
-        """Format result as Markdown table"""
-        comparisons = result.get("comparisons", [])
-        if not comparisons:
-            return "No data"
-        
-        all_signals = result.get("signals", [])
-        
-        # Build table headers
-        headers = ["Time(ns)"] + all_signals + ["Result"]
-        lines = [
-            "| " + " | ".join(headers) + " |",
-            "|" + "|".join(["------"] * len(headers)) + "|"
-        ]
-        
-        # 数据行
-        for comp in comparisons:
-            time_val = comp.get("time", 0)
-            values = [str(time_val)]
-            
-            for sig in all_signals:
-                val = comp.get("signal_values", {}).get(sig, "-")
-                values.append(str(val))
-            
-            match = comp.get("match", False)
-            values.append("✓" if match else "✗")
-            
-            lines.append("| " + " | ".join(values) + " |")
-        
-        return "\n".join(lines)
 
 
 # 单例实例
