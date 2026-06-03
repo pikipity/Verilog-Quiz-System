@@ -80,11 +80,11 @@ jobs:
       # ========== 6. 用 flet build 打包 ==========
       - name: Build with flet (Linux x64)
         if: matrix.target == 'linux'
-        run: yes | flet build ${{ matrix.build_cmd }} --output dist
+        run: yes | flet build ${{ matrix.build_cmd }} --output dist --clear-cache
 
       - name: Build with flet (Linux ARM64)
         if: matrix.target == 'linux-arm64'
-        run: yes | flet build ${{ matrix.build_cmd }} --output dist
+        run: yes | flet build ${{ matrix.build_cmd }} --output dist --clear-cache
 
       # ========== 7. 整理构建产物：清理开发文件并打包成 zip ==========
       - name: Prepare artifact
@@ -162,6 +162,25 @@ jobs:
           echo "---"
           echo "Files remaining in $PLATFORM_DIR:"
           ls -la "$PLATFORM_DIR"
+
+          # ========== 创建 Linux .desktop 启动器和图标 ==========
+          if [ -f "assets/icon.png" ]; then
+            cp assets/icon.png "$PLATFORM_DIR/verilog-quiz-system.png"
+            echo "Copied icon to $PLATFORM_DIR/verilog-quiz-system.png"
+          fi
+          cat > "$PLATFORM_DIR/verilog-quiz-system.desktop" << 'EOF'
+[Desktop Entry]
+Version=1.0
+Name=Verilog Quiz System
+Comment=Verilog Assignment and Exam System
+Exec=verilog-quiz-system
+Icon=verilog-quiz-system
+Terminal=false
+Type=Application
+Categories=Education;Development;
+EOF
+          chmod +x "$PLATFORM_DIR/verilog-quiz-system.desktop"
+          echo "Created .desktop file"
 
           # ========== 打包 ==========
           mkdir -p release
