@@ -168,17 +168,17 @@ jobs:
             cp assets/icon.png "$PLATFORM_DIR/verilog-quiz-system.png"
             echo "Copied icon to $PLATFORM_DIR/verilog-quiz-system.png"
           fi
-          cat > "$PLATFORM_DIR/verilog-quiz-system.desktop" << 'EOF'
-[Desktop Entry]
-Version=1.0
-Name=Verilog Quiz System
-Comment=Verilog Assignment and Exam System
-Exec=verilog-quiz-system
-Icon=verilog-quiz-system
-Terminal=false
-Type=Application
-Categories=Education;Development;
-EOF
+          printf '%s\n' \
+            '[Desktop Entry]' \
+            'Version=1.0' \
+            'Name=Verilog Quiz System' \
+            'Comment=Verilog Assignment and Exam System' \
+            'Exec=verilog-quiz-system' \
+            'Icon=verilog-quiz-system' \
+            'Terminal=false' \
+            'Type=Application' \
+            'Categories=Education;Development;' \
+            > "$PLATFORM_DIR/verilog-quiz-system.desktop"
           chmod +x "$PLATFORM_DIR/verilog-quiz-system.desktop"
           echo "Created .desktop file"
 
