@@ -1,0 +1,9 @@
+[Desktop Entry]
+Version=1.0
+Name=Verilog Quiz System
+Comment=Verilog Assignment and Exam System
+Exec=bash -c 'cd "$(dirname "$(realpath "%k")")" && ./verilog-quiz-system'
+Icon=verilog-quiz-system
+Terminal=false
+Type=Application
+Categories=Education;Development;
