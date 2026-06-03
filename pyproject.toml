@@ -6,8 +6,8 @@ readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
     "cryptography>=46.0.6",
-    "flet>=0.83.1",
-    "flet-desktop>=0.83.1",
+    "flet==0.83.1",
+    "flet-desktop==0.83.1",
     "requests>=2.33.1",
 ]
 
