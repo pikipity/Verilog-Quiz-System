@@ -210,10 +210,10 @@ jobs:
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
-          tag_name: v1.0.${{ github.run_number }}
-          name: Release v1.0.${{ github.run_number }}
+          tag_name: v2.0.${{ github.run_number }}
+          name: Release v2.0.${{ github.run_number }}
           body: |
-            ## Verilog Quiz System v1.0.${{ github.run_number }}
+            ## Verilog Quiz System v2.0.${{ github.run_number }}
 
             自动构建版本（flet build，开箱即用）
 

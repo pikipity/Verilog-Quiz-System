@@ -70,12 +70,14 @@ class VerilogQuizApp:
         self.current_question_index = question_index
         self.show_question_view(self.current_week, question_index)
     
-    def show_snackbar(self, message: str, color=ft.Colors.BLUE):
+    def show_snackbar(self, message: str, color=ft.Colors.BLUE, duration=None):
         """Show snackbar"""
         snack = ft.SnackBar(
             content=ft.Text(message),
             bgcolor=color,
         )
+        if duration is not None:
+            snack.duration = duration
         self.page.overlay.append(snack)
         snack.open = True
         self.page.update()
