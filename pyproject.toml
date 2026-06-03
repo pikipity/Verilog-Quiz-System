@@ -33,6 +33,9 @@ exclude = [
     "setup_local_data.py",
     "setup_test_server.py",
     "test_server",
+    "questions",
+    "submissions",
+    "reports",
 ]
 
 [dependency-groups]
