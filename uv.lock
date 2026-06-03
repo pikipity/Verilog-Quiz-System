@@ -557,8 +557,8 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "cryptography", specifier = ">=46.0.6" },
-    { name = "flet", specifier = ">=0.83.1" },
-    { name = "flet-desktop", specifier = ">=0.83.1" },
+    { name = "flet", specifier = "==0.83.1" },
+    { name = "flet-desktop", specifier = "==0.83.1" },
     { name = "requests", specifier = ">=2.33.1" },
 ]
 
