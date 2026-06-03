@@ -35,34 +35,44 @@ class CodeExecutor:
         self.use_wsl = False
         self.gtkwave_available = False
         self.gtkwave_mode = None  # 'native', 'wsl', or None
+        self.missing_tools = []   # 记录缺失的依赖工具
         self._detect_iverilog()
         self._detect_gtkwave()
     
     def _detect_iverilog(self):
         """Detect iverilog environment"""
+        detected = False
         if self.system in ['Linux', 'Darwin']:
             # Linux/Mac direct detection
             try:
                 subprocess.run(['iverilog', '-V'], capture_output=True, check=True)
                 print("Detected iverilog (Linux/Mac)")
+                detected = True
             except (subprocess.CalledProcessError, FileNotFoundError):
-                print("Warning: iverilog not detected, please install")
+                pass
         else:
             # Windows: 先尝试直接调用
             try:
                 subprocess.run(['iverilog', '-V'], capture_output=True, check=True)
                 print("Detected iverilog (Windows)")
+                detected = True
             except (subprocess.CalledProcessError, FileNotFoundError):
                 # 尝试WSL
                 try:
                     subprocess.run(['wsl', 'iverilog', '-V'], capture_output=True, check=True)
                     self.use_wsl = True
                     print("Detected iverilog (WSL)")
+                    detected = True
                 except (subprocess.CalledProcessError, FileNotFoundError):
-                    print("Warning: iverilog not detected (Windows/WSL)")
+                    pass
+        
+        if not detected:
+            self.missing_tools.append("iverilog")
+            print("Error: iverilog not detected, please install")
     
     def _detect_gtkwave(self):
         """Detect GTKWave environment"""
+        detected = False
         if self.system in ['Linux', 'Darwin']:
             # Linux/Mac: check if gtkwave is in PATH
             try:
@@ -70,8 +80,9 @@ class CodeExecutor:
                 self.gtkwave_available = True
                 self.gtkwave_mode = 'native'
                 print("Detected GTKWave (Linux/Mac)")
+                detected = True
             except (subprocess.CalledProcessError, FileNotFoundError):
-                print("Warning: GTKWave not detected, please install")
+                pass
         else:
             # Windows: Try native first, then WSL
             # 1. Try native GTKWave.exe
@@ -84,16 +95,23 @@ class CodeExecutor:
                     self.gtkwave_available = True
                     self.gtkwave_mode = 'native'
                     print(f"Detected GTKWave (Windows native): {path}")
-                    return
+                    detected = True
+                    break
             
             # 2. Try WSL GTKWave
-            try:
-                subprocess.run(['wsl', 'which', 'gtkwave'], capture_output=True, check=True)
-                self.gtkwave_available = True
-                self.gtkwave_mode = 'wsl'
-                print("Detected GTKWave (WSL)")
-            except (subprocess.CalledProcessError, FileNotFoundError):
-                print("Warning: GTKWave not detected (Windows/WSL)")
+            if not detected:
+                try:
+                    subprocess.run(['wsl', 'which', 'gtkwave'], capture_output=True, check=True)
+                    self.gtkwave_available = True
+                    self.gtkwave_mode = 'wsl'
+                    print("Detected GTKWave (WSL)")
+                    detected = True
+                except (subprocess.CalledProcessError, FileNotFoundError):
+                    pass
+        
+        if not detected:
+            self.missing_tools.append("GTKWave")
+            print("Error: GTKWave not detected, please install")
     
     def _run_command(self, cmd: List[str], cwd: str = None, timeout: int = 30) -> Tuple[bool, str, str]:
         """
