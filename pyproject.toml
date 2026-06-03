@@ -11,6 +11,9 @@ dependencies = [
     "requests>=2.33.1",
 ]
 
+[tool.flet]
+icon = "assets/icon.png"
+
 [tool.flet.app]
 exclude = [
     ".git",
