@@ -51,7 +51,21 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y clang cmake ninja-build pkg-config libblkid-dev liblzma-dev libgtk-3-dev libstdc++-12-dev
 
-      # ========== 3. 设置 Python ==========
+      # ========== 3. ARM64 预装 Flutter SDK ==========
+      # flet 0.83.1 绑定 Flutter 3.41.4；Flutter 官方未提供 Linux ARM64 预编译包，
+      # 故通过 git clone 获取，让 flutter 工具自行下载对应架构的 Dart SDK。
+      - name: Setup Flutter SDK (ARM64)
+        if: matrix.target == 'linux-arm64'
+        run: |
+          echo "Installing Flutter SDK 3.41.4 for ARM64..."
+          git clone https://github.com/flutter/flutter.git -b 3.41.4 --depth 1 "$HOME/flutter"
+          export PATH="$HOME/flutter/bin:$PATH"
+          echo "$HOME/flutter/bin" >> "$GITHUB_PATH"
+          flutter config --no-analytics
+          flutter precache --linux
+          flutter --version
+
+      # ========== 4. 设置 Python ==========
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
