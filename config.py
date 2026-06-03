@@ -11,8 +11,11 @@ APP_NAME = "Verilog Quiz System"
 
 def get_app_data_dir():
     """Get application data directory (use fixed location after packaging)"""
-    # Detect if in PyInstaller packaged environment
-    if getattr(sys, 'frozen', False):
+    # Detect if in packaged environment (PyInstaller or flet build)
+    # flet build sets FLET_PLATFORM environment variable
+    is_packaged = getattr(sys, 'frozen', False) or os.getenv("FLET_PLATFORM") is not None
+    
+    if is_packaged:
         # Packaged program
         if sys.platform == 'win32':
             # Windows: C:\Users\<User>\AppData\Local\Verilog-Quiz
