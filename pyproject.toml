@@ -11,6 +11,30 @@ dependencies = [
     "requests>=2.33.1",
 ]
 
+[tool.flet.app]
+exclude = [
+    ".git",
+    ".github",
+    ".venv",
+    "__pycache__",
+    "AGENTS.md",
+    "DEV_PROGRESS.md",
+    "README.md",
+    "Manual for EIE330 Students.md",
+    "LICENSE",
+    "uv.lock",
+    ".python-version",
+    ".gitignore",
+    ".gitattributes",
+    "debug_check.py",
+    "encrypt_refs.py",
+    "fix_draw_result.py",
+    "fix_server_encoding.py",
+    "setup_local_data.py",
+    "setup_test_server.py",
+    "test_server",
+]
+
 [dependency-groups]
 dev = [
     "pyinstaller>=6.19.0",
