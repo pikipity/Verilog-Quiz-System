@@ -80,11 +80,11 @@ jobs:
       # ========== 6. 用 flet build 打包 ==========
       - name: Build with flet (Linux x64)
         if: matrix.target == 'linux'
-        run: yes | flet build ${{ matrix.build_cmd }} --output dist
+        run: yes | flet build ${{ matrix.build_cmd }} --output dist --icon assets/icon.png
 
       - name: Build with flet (Linux ARM64)
         if: matrix.target == 'linux-arm64'
-        run: yes | flet build ${{ matrix.build_cmd }} --output dist
+        run: yes | flet build ${{ matrix.build_cmd }} --output dist --icon assets/icon.png
 
       # ========== 7. 整理构建产物：清理开发文件并打包成 zip ==========
       - name: Prepare artifact

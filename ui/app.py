@@ -144,6 +144,9 @@ class VerilogQuizApp:
             visual_density=ft.VisualDensity.COMFORTABLE,
         )
         
+        # Set window icon
+        self.page.window.icon = "assets/icon.png"
+        
         # Page scroll configuration
         self.page.scroll = ft.ScrollMode.AUTO
     
