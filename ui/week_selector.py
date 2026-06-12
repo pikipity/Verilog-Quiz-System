@@ -8,7 +8,7 @@ import json
 import threading
 from datetime import datetime
 import flet as ft
-from config import QUESTIONS_DIR, SUBMISSIONS_DIR, SERVER_URL, BASE_DIR
+from config import QUESTIONS_DIR, SUBMISSIONS_DIR, BASE_DIR
 
 
 class WeekSelector:
@@ -199,11 +199,6 @@ class WeekSelector:
                             open_data_btn,
                         ],
                         spacing=10,
-                    ),
-                    ft.Text(
-                        f"Server: {SERVER_URL}",
-                        size=12,
-                        color=ft.Colors.GREY,
                     ),
                 ],
                 alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
