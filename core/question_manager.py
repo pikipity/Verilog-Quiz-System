@@ -98,7 +98,7 @@ class QuestionManager:
             
         except requests.exceptions.ConnectionError as e:
             print(f"连接服务器失败: {e}")
-            return "error", [], f"无法连接到服务器\n请检查:\n1. 服务器是否已启动\n2. 网络连接是否正常\n3. 服务器地址配置是否正确\n\n当前配置: {self.server_url}"
+            return "error", [], "无法连接到服务器\n请检查:\n1. 服务器是否已启动\n2. 网络连接是否正常\n3. 服务器地址配置是否正确"
         except requests.exceptions.Timeout as e:
             print(f"连接超时: {e}")
             return "error", [], "连接服务器超时，请检查网络"
