@@ -71,7 +71,7 @@ async function loadWeeks(listEl) {
       <span class="badge ${w.completed >= w.total && w.total > 0 ? 'done' : 'todo'}">
         ${w.completed >= w.total && w.total > 0 ? '已完成' : '进行中'}
       </span>
-      <div class="week-progress">完成 ${w.completed}/${w.total} 题</div>
+      <div class="week-progress">完成 ${w.completed}/${w.total} 题　<a href="#/report/${w.week}">查看报告 →</a></div>
       <div class="questions" data-week="${w.week}"></div>
     </div>
   `).join('');

@@ -22,7 +22,14 @@ from urllib.parse import urlparse, parse_qs
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import config
-from backend.services import settings_service, sync_service, question_service, yosys_service
+from backend.services import (
+    settings_service,
+    sync_service,
+    question_service,
+    yosys_service,
+    report_service,
+    diagnostics,
+)
 
 TOKEN = os.environ.get("VERILOG_QUIZ_TOKEN") or secrets.token_urlsafe(24)
 
@@ -83,6 +90,16 @@ class QuizHandler(BaseHTTPRequestHandler):
             return False
         return True
 
+    def _read_body(self):
+        """读取 JSON 请求体；非法返回 None。"""
+        length = int(self.headers.get('Content-Length') or 0)
+        if length <= 0:
+            return {}
+        try:
+            return json.loads(self.rfile.read(length).decode('utf-8'))
+        except (json.JSONDecodeError, UnicodeDecodeError):
+            return None
+
     # ---------- 路由 ----------
 
     def do_GET(self):
@@ -97,68 +114,78 @@ class QuizHandler(BaseHTTPRequestHandler):
     def do_POST(self):
         if not self._guard():
             return
-        path = urlparse(self.path).path
-        self._handle_api_post(path)
+        self._handle_api_write(urlparse(self.path).path)
 
     def do_PUT(self):
         if not self._guard():
             return
-        path = urlparse(self.path).path
-        self._handle_api_post(path)
+        self._handle_api_write(urlparse(self.path).path)
 
-    # ---------- API ----------
-
-    def _read_body(self):
-        """读取 JSON 请求体；非法返回 None。"""
-        length = int(self.headers.get('Content-Length') or 0)
-        if length <= 0:
-            return {}
-        try:
-            return json.loads(self.rfile.read(length).decode('utf-8'))
-        except (json.JSONDecodeError, UnicodeDecodeError):
-            return None
+    # ---------- GET API ----------
 
     def _handle_api_get(self, path: str):
         if path == '/api/health':
             self._send_json({"ok": True, "version": config.VERSION})
-        elif path == '/api/settings':
+            return
+        if path == '/api/settings':
             settings = settings_service.load_settings()
             settings["configured"] = bool(settings["student_id"].strip())
             self._send_json(settings)
-        elif path == '/api/weeks':
+            return
+        if path == '/api/weeks':
             self._send_json({"weeks": sync_service.list_weeks()})
-        else:
-            m = re.fullmatch(r'/api/weeks/(\d+)/questions', path)
-            if m:
-                questions = sync_service.list_questions(int(m.group(1)))
-                if questions is None:
-                    self._send_json({"error": "not found"}, 404)
-                else:
-                    self._send_json({"questions": questions})
-                return
+            return
+        if path == '/api/tools/status':
+            self._send_json(diagnostics.get_tools_status())
+            return
 
-            m = re.fullmatch(r'/api/questions/(\d+)/([\w-]+)(/code|/result)?', path)
-            if m:
-                week, qid, suffix = int(m.group(1)), m.group(2), m.group(3)
-                if suffix is None:
-                    data = question_service.get_question(week, qid)
-                elif suffix == '/code':
-                    data = question_service.get_code(week, qid)
-                else:
-                    data = question_service.get_result(week, qid)
-                if data is None:
-                    self._send_json({"error": "not found"}, 404)
-                else:
-                    self._send_json(data)
-            else:
+        m = re.fullmatch(r'/api/reports/(\d+)', path)
+        if m:
+            self._send_json(report_service.get_report(int(m.group(1))))
+            return
+
+        m = re.fullmatch(r'/api/weeks/(\d+)/questions', path)
+        if m:
+            questions = sync_service.list_questions(int(m.group(1)))
+            if questions is None:
                 self._send_json({"error": "not found"}, 404)
+            else:
+                self._send_json({"questions": questions})
+            return
 
-    def _handle_api_post(self, path: str):
+        m = re.fullmatch(r'/api/questions/(\d+)/([\w-]+)(/code|/result)?', path)
+        if m:
+            week, qid, suffix = int(m.group(1)), m.group(2), m.group(3)
+            if suffix is None:
+                data = question_service.get_question(week, qid)
+            elif suffix == '/code':
+                data = question_service.get_code(week, qid)
+            else:
+                data = question_service.get_result(week, qid)
+            if data is None:
+                self._send_json({"error": "not found"}, 404)
+            else:
+                self._send_json(data)
+            return
+
+        self._send_json({"error": "not found"}, 404)
+
+    # ---------- POST/PUT API ----------
+
+    def _handle_api_write(self, path: str):
         if path == '/api/sync' and self.command == 'POST':
             self._send_json(sync_service.run_sync())
-        elif path == '/api/server/check' and self.command == 'POST':
+            return
+        if path == '/api/server/check' and self.command == 'POST':
             self._send_json(sync_service.check_server())
-        elif path == '/api/settings' and self.command == 'PUT':
+            return
+        if path == '/api/tools/selfcheck' and self.command == 'POST':
+            self._send_json(diagnostics.run_selfcheck())
+            return
+        if path == '/api/tools/gtkwave_test' and self.command == 'POST':
+            self._send_json(diagnostics.test_open_gtkwave())
+            return
+        if path == '/api/settings' and self.command == 'PUT':
             body = self._read_body()
             if body is None:
                 self._send_json({"error": "请求体不是合法 JSON"}, 400)
@@ -166,30 +193,39 @@ class QuizHandler(BaseHTTPRequestHandler):
                 result = settings_service.save_settings(body)
                 self._send_json(result, 200 if result.get("saved") else 400)
             return
-        else:
-            m = re.fullmatch(r'/api/questions/(\d+)/([\w-]+)/(test|complete|gtkwave|code|rtl)', path)
-            if not m:
-                self._send_json({"error": "not found"}, 404)
-                return
-            week, qid, action = int(m.group(1)), m.group(2), m.group(3)
-            body = self._read_body()
-            if body is None:
-                self._send_json({"error": "请求体不是合法 JSON"}, 400)
-                return
 
-            if action == 'code' and self.command == 'PUT':
-                self._send_json(question_service.save_code(week, qid, str(body.get("code", ""))))
-            elif action == 'test' and self.command == 'POST':
-                self._send_json(question_service.run_test(week, qid, str(body.get("code", ""))))
-            elif action == 'complete' and self.command == 'POST':
-                self._send_json(question_service.set_completed(week, qid))
-            elif action == 'gtkwave' and self.command == 'POST':
-                which = parse_qs(urlparse(self.path).query).get('which', ['student'])[0]
-                self._send_json(question_service.open_gtkwave(week, qid, which))
-            elif action == 'rtl' and self.command == 'POST':
-                self._send_json(yosys_service.generate_rtl(week, qid))
+        m = re.fullmatch(r'/api/reports/(\d+)/(generate|open_folder)', path)
+        if m and self.command == 'POST':
+            week = int(m.group(1))
+            if m.group(2) == 'generate':
+                self._send_json(report_service.generate_report(week))
             else:
-                self._send_json({"error": "not found"}, 404)
+                self._send_json(report_service.open_reports_folder())
+            return
+
+        m = re.fullmatch(r'/api/questions/(\d+)/([\w-]+)/(test|complete|gtkwave|code|rtl)', path)
+        if not m:
+            self._send_json({"error": "not found"}, 404)
+            return
+        week, qid, action = int(m.group(1)), m.group(2), m.group(3)
+        body = self._read_body()
+        if body is None:
+            self._send_json({"error": "请求体不是合法 JSON"}, 400)
+            return
+
+        if action == 'code' and self.command == 'PUT':
+            self._send_json(question_service.save_code(week, qid, str(body.get("code", ""))))
+        elif action == 'test' and self.command == 'POST':
+            self._send_json(question_service.run_test(week, qid, str(body.get("code", ""))))
+        elif action == 'complete' and self.command == 'POST':
+            self._send_json(question_service.set_completed(week, qid))
+        elif action == 'gtkwave' and self.command == 'POST':
+            which = parse_qs(urlparse(self.path).query).get('which', ['student'])[0]
+            self._send_json(question_service.open_gtkwave(week, qid, which))
+        elif action == 'rtl' and self.command == 'POST':
+            self._send_json(yosys_service.generate_rtl(week, qid))
+        else:
+            self._send_json({"error": "not found"}, 404)
 
     # ---------- 静态文件 ----------
 

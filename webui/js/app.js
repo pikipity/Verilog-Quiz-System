@@ -2,10 +2,13 @@ import { initToken, api } from './api.js';
 import { renderSettings } from './pages/settings.js';
 import { renderWeeks } from './pages/weeks.js';
 import { renderQuestion } from './pages/question.js';
+import { renderReport } from './pages/report.js';
+import { renderDiagnostics } from './pages/diagnostics.js';
 
 const routes = {
   '#/settings': renderSettings,
   '#/weeks': renderWeeks,
+  '#/diagnostics': renderDiagnostics,
 };
 
 async function route() {
@@ -39,6 +42,11 @@ async function route() {
     const qm = hash.match(/^#\/question\/(\d+)\/([\w-]+)$/);
     if (qm) {
       await renderQuestion(app, parseInt(qm[1], 10), qm[2]);
+      return;
+    }
+    const rm = hash.match(/^#\/report\/(\d+)$/);
+    if (rm) {
+      await renderReport(app, parseInt(rm[1], 10));
       return;
     }
     const page = routes[hash] || renderWeeks;

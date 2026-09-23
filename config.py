@@ -66,11 +66,13 @@ def get_server_url() -> str:
 # 加密配置（内置固定密钥，防无意查看，不防专业破解）
 MASTER_KEY = b"VerilogQuiz2025@SecureKeyForStudents!!"
 
-# 工具锁定版本（诊断页比对用，发布前实测更新）
+# 工具锁定版本（诊断页比对用）
+# 与老师验证环境（Ubuntu 22.04 / WSL）一致：iverilog 11.0、GTKWave 3.3.104、Yosys 0.9
+# 全部功能已在上述版本实测通过；更高版本显示黄灯但仍可用
 PINNED_VERSIONS = {
-    "iverilog": "12.0",
+    "iverilog": "11.0",
     "gtkwave": "3.3",
-    "yosys": "0.40",
+    "yosys": "0.9",
 }
 
 # 定时自动保存间隔（秒）

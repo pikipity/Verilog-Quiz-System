@@ -1,180 +1,166 @@
 """
-报告生成器 - 生成Markdown格式的作业报告
+报告生成器 v2 - 学号/姓名头部 + 数值对比表（仅供老师判卷）
 """
-import os
 import json
+import os
 import re
 from datetime import datetime
-from pathlib import Path
-from typing import List, Dict, Optional
-from config import QUESTIONS_DIR, SUBMISSIONS_DIR, REPORTS_DIR
+from typing import List, Optional
+
+import config
+from core.result_analyzer import result_analyzer
 
 
 class ReportGenerator:
-    """
-    Report Generator
-    
-    Integrate student code and test results to generate Markdown reports
-    Use ID system to find questions and results
-    """
-    
-    def __init__(self):
-        pass
-    
-    def generate_week_report(self, week: int) -> Optional[str]:
-        """
-        Generate week report
-        
-        Args:
-            week: Week number
-            
-        Returns:
-            Generated report file path, None if failed
-        """
-        # Read draw result (new format)
-        draw_file = os.path.join(QUESTIONS_DIR, f"week{week}", "draw_result.json")
-        if not os.path.exists(draw_file):
-            print(f"Draw result not found: {draw_file}")
+    """整合题目、学生代码、测试结果与数值对比，生成 Markdown 报告。"""
+
+    def generate_week_report(self, week: int, student: dict = None) -> Optional[str]:
+        """生成指定周的报告，返回文件路径；失败返回 None。"""
+        student = student or {}
+        draw_data = self._read_json(os.path.join(
+            config.QUESTIONS_DIR, f"week{week}", "draw_result.json"))
+        if not draw_data:
             return None
-        
-        with open(draw_file, 'r', encoding='utf-8') as f:
-            draw_data = json.load(f)
-        
         drawn_questions = draw_data.get("drawn_questions", [])
-        
-        # Read week info
-        info_file = os.path.join(QUESTIONS_DIR, f"week{week}", "info.json")
-        week_title = f"Week {week}"
-        if os.path.exists(info_file):
-            with open(info_file, 'r', encoding='utf-8') as f:
-                info = json.load(f)
-                week_title = info.get("title", week_title)
-        
-        # Generate report content
-        report_lines = [
+
+        info = self._read_json(os.path.join(
+            config.QUESTIONS_DIR, f"week{week}", "info.json"), {}) or {}
+        week_title = info.get("title", f"Week {week}")
+
+        lines = [
             f"# Verilog Assignment Report - Week {week}: {week_title}",
             "",
+            f"**Student ID**: {student.get('student_id', '')}",
+            f"**Name**: {student.get('name', '')}",
             f"**Generated**: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
             f"**Questions**: {len(drawn_questions)}",
             "",
             "---",
             "",
         ]
-        
-        # Generate each question (using ID lookup)
+
         for idx, q_info in enumerate(drawn_questions, 1):
-            q_content = self._generate_question_section(week, idx, q_info)
-            report_lines.extend(q_content)
-            report_lines.extend(["", "---", ""])
-        
-        # 保存报告
-        os.makedirs(REPORTS_DIR, exist_ok=True)
-        report_path = os.path.join(REPORTS_DIR, f"week{week}_report.md")
-        
+            lines.extend(self._question_section(week, idx, q_info))
+            lines.extend(["", "---", ""])
+
+        os.makedirs(config.REPORTS_DIR, exist_ok=True)
+        report_path = os.path.join(config.REPORTS_DIR, f"week{week}_report.md")
         with open(report_path, 'w', encoding='utf-8') as f:
-            f.write("\n".join(report_lines))
-        
-        print(f"Report generated: {report_path}")
+            f.write("\n".join(lines))
         return report_path
-    
-    def _generate_question_section(self, week: int, index: int, q_info: dict) -> List[str]:
-        """
-        Generate report section for single question
-        
-        Args:
-            week: Week number
-            index: Question index (starting from 1)
-            q_info: Question info dict (contains id, folder, title)
-            
-        Returns:
-            List of Markdown lines
-        """
-        qid = q_info['id']
-        title = q_info.get('title', f'Question {index}')
-        
-        lines = [f"## Question {index} (ID: {qid})",
-                 f"**Title**: {title}",
-                 ""]
-        
-        # 1. Question description (using ID directory)
+
+    # ---------- 单题段落 ----------
+
+    def _question_section(self, week: int, index: int, q_info: dict) -> List[str]:
+        qid = q_info["id"]
+        title = q_info.get("title", f"Question {index}")
+
+        lines = [f"## Question {index} (ID: {qid})", f"**Title**: {title}", ""]
+
         question_md = self._load_question_markdown(week, qid)
         if question_md:
-            question_md = self._filter_images(question_md)
-            lines.extend(["### Question Description", "", question_md])
-        
-        # 2. Student code (using ID naming)
+            lines.extend(["### Question Description", "", self._filter_images(question_md)])
+
         code = self._load_student_code(week, qid)
         if code:
             lines.extend(["", "### Student Code", "", "```verilog", code, "```"])
         else:
             lines.extend(["", "### Student Code", "", "*No code submitted*"])
-        
-        # 3. Test results (using ID naming)
+
         result = self._load_test_result(week, qid)
+        lines.extend(["", "### Test Results", ""])
         if result:
-            lines.extend(["", "### Test Results", ""])
-            
-            # Check compile and run status
-            compile_success = result.get("compile_success", False)
-            run_success = result.get("run_success", False)
-            
-            if not compile_success:
-                error = result.get("error", "Compilation failed")
-                lines.append(f"**Status**: ❌ Compilation Failed")
-                if error:
-                    lines.append(f"**Error**: {error}")
-            elif not run_success:
-                error = result.get("error", "Execution failed")
-                lines.append(f"**Status**: ❌ Execution Failed")
-                if error:
-                    lines.append(f"**Error**: {error}")
-            else:
-                # Both compile and run successful
-                lines.append(f"**Status**: ✅ Test Completed")
-                lines.append("")
-                
-                # Add simulation output (if any)
-                output = result.get("output", "")
-                if output:
-                    lines.append("**Simulation Output**:")
-                    lines.append("```")
-                    lines.append(output[:500] if len(output) > 500 else output)
-                    lines.append("```")
+            lines.extend(self._test_result_lines(result))
+            lines.extend(self._comparison_table(result))
         else:
-            lines.extend(["", "### Test Results", "", "*Not tested yet*"])
-        
+            lines.append("*Not tested yet*")
+
         return lines
-    
+
+    def _test_result_lines(self, result: dict) -> List[str]:
+        if not result.get("compile_success"):
+            lines = ["**Status**: ❌ Compilation Failed"]
+            if result.get("error"):
+                lines.append(f"**Error**: {result['error']}")
+            return lines
+        if not result.get("run_success"):
+            lines = ["**Status**: ❌ Execution Failed"]
+            if result.get("error"):
+                lines.append(f"**Error**: {result['error']}")
+            return lines
+
+        lines = ["**Status**: ✅ Test Completed", ""]
+        output = result.get("output", "")
+        if output:
+            lines.append("**Simulation Output**:")
+            lines.append("```")
+            lines.append(output[:500] if len(output) > 500 else output)
+            lines.append("```")
+        return lines
+
+    def _comparison_table(self, result: dict) -> List[str]:
+        """学生 vs 参考输出的逐时刻数值对比表。"""
+        ref_output = result.get("ref_output", "")
+        stu_output = result.get("output", "")
+        if not result.get("run_success") or not ref_output or not stu_output:
+            return []
+
+        ref_entries = result_analyzer._parse_display_output(ref_output)
+        if not ref_entries:
+            return []
+        signals = [k for k in ref_entries[0].keys() if k != "time"]
+        if not signals:
+            return []
+
+        analysis = result_analyzer.analyze_from_display(ref_output, stu_output, signals)
+        if not analysis.success or not analysis.comparisons:
+            return []
+
+        lines = [
+            "",
+            "**Value Comparison** (reference vs student):",
+            "",
+            "| 时间(ns) | 参考 | 学生 | 结果 |",
+            "|---|---|---|---|",
+        ]
+        for comp in analysis.comparisons:
+            ref_str = " ".join(f"{k}={v}" for k, v in comp.signal_values.items())
+            stu_str = " ".join(f"{sig}={comp.actual_outputs.get(sig, '?')}" for sig in signals)
+            mark = "✓" if comp.match else "✗"
+            lines.append(f"| {comp.time} | {ref_str} | {stu_str} | {mark} |")
+
+        lines.extend(["", f"**Overall**: {'✅ 全部一致' if analysis.all_match else '❌ 存在不一致'}"])
+        return lines
+
+    # ---------- 数据读取 ----------
+
+    def _read_json(self, path: str, default=None):
+        try:
+            with open(path, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except (OSError, json.JSONDecodeError):
+            return default
+
     def _load_question_markdown(self, week: int, qid: str) -> str:
-        """Load question description (using ID as directory name)"""
-        md_file = os.path.join(QUESTIONS_DIR, f"week{week}", qid, "question.md")
+        md_file = os.path.join(config.QUESTIONS_DIR, f"week{week}", qid, "question.md")
         if os.path.exists(md_file):
             with open(md_file, 'r', encoding='utf-8') as f:
                 return f.read()
         return ""
-    
+
     def _filter_images(self, markdown: str) -> str:
-        """Filter image syntax from Markdown"""
-        result = re.sub(r'!\[([^\]]*)\]\([^\)]+\)', r'[Image: \1]', markdown)
-        return result
-    
+        return re.sub(r'!\[([^\]]*)\]\([^\)]+\)', r'[Image: \1]', markdown)
+
     def _load_student_code(self, week: int, qid: str) -> str:
-        """Load student code (using ID naming, organized by question subfolder)"""
-        code_file = os.path.join(SUBMISSIONS_DIR, f"week{week}", qid, f"{qid}.v")
+        code_file = os.path.join(config.SUBMISSIONS_DIR, f"week{week}", qid, f"{qid}.v")
         if os.path.exists(code_file):
             with open(code_file, 'r', encoding='utf-8') as f:
                 return f.read()
         return ""
-    
-    def _load_test_result(self, week: int, qid: str) -> Optional[Dict]:
-        """Load test results (using ID naming, organized by question subfolder)"""
-        result_file = os.path.join(SUBMISSIONS_DIR, f"week{week}", qid, "result.json")
-        if os.path.exists(result_file):
-            with open(result_file, 'r', encoding='utf-8') as f:
-                return json.load(f)
-        return None
-    
+
+    def _load_test_result(self, week: int, qid: str) -> Optional[dict]:
+        return self._read_json(os.path.join(
+            config.SUBMISSIONS_DIR, f"week{week}", qid, "result.json"))
 
 
-# 单例实例
 report_generator = ReportGenerator()

@@ -25,6 +25,7 @@ MANIFEST
 # PyInstaller
 *.manifest
 *.spec
+!verilog-quiz.spec
 
 # Virtual environments
 .venv
@@ -46,6 +47,9 @@ submissions/*/
 !submissions/.gitkeep
 reports/*.md
 !reports/.gitkeep
+settings.json
+app.log
+temp_selfcheck/
 
 # OS
 .DS_Store
