@@ -24,7 +24,7 @@ v2 的核心原则：**把环境差异降到理论下限**
 | **GUI** | 学生默认浏览器 | 无构建原生 ES Modules SPA，第三方库全部 vendored 进包 |
 | **后端** | Python 标准库 HTTP 服务 | ThreadingHTTPServer，只绑 127.0.0.1:随机端口，随机 token 鉴权 |
 | **打包** | PyInstaller onedir | 四平台 CI 构建，零第三方 Python 依赖（不用 requests/cryptography/flet） |
-| **题目分发** | HTTP 静态文件 | 服务器结构不变，manifest 增加 schema_version |
+| **题目分发** | HTTP 静态文件 | 服务器结构不变，与 V1 共用同一 manifest |
 | **加密** | 内置密钥 + SHA256 派生 + XOR + Base64 | 不变，仅加密 reference.v（hashlib 标准库实现） |
 | **仿真执行** | iverilog + vvp | 锁定版本，学生自行安装 |
 | **波形查看** | GTKWave | 锁定版本，学生自行安装 |
@@ -37,7 +37,7 @@ v2 的核心原则：**把环境差异降到理论下限**
 
 ```
 https://your-server.com/verilog-quiz/
-├── manifest.json                    # 全局清单（v2 增加 schema_version 字段）
+├── manifest.json                    # 全局清单（与 V1 共用，格式不变）
 ├── week1/
 │   ├── info.json                    # 周次配置（id/folder 分离格式）
 │   ├── q1/
@@ -48,16 +48,16 @@ https://your-server.com/verilog-quiz/
 └── ...
 ```
 
-### manifest.json（v2）
+### manifest.json（与 V1 共用，schema_version 为可选）
 
 ```json
 {
-  "schema_version": 2,
+  "version": "1.0",
   "weeks": ["week1", "week2", "week3"]
 }
 ```
 
-`schema_version` 是对账同步的合法性闸门：字段缺失或值不支持时，客户端中止同步且**不删除任何本地数据**。老师下次发布题目时加入该字段。
+**V1/V2 共用同一套题目与 manifest**，不要求新增任何字段。`schema_version` 是可选的：不存在时按 V1 格式处理（仅结构校验）；存在时必须是受支持的版本号，否则中止同步。中止条件：拉取失败、JSON 结构非法（非对象/weeks 缺失或格式错）、显式声明了不支持的 schema_version——任何中止都**不删除任何本地数据**。
 
 ### info.json 格式（不变）
 
@@ -119,7 +119,7 @@ Verilog-Quiz-System/
 | `POST /api/tools/selfcheck` | 用内置最小样例做功能自检 |
 | `POST /api/sync` | 检查更新+对账，返回变更摘要（新增/更新/移除） |
 | `GET /api/weeks` | 周次列表+进度 |
-| `GET /api/weeks/{n}/questions` | 抽中题目列表（含完成状态） |
+| `GET /api/weeks/{n}/questions` | 抽中题目列表（含已尝试状态） |
 | `GET /api/questions/{week}/{qid}` | 题面（图片base64内嵌）+ testbench |
 | `GET/PUT /api/questions/{week}/{qid}/code` | 学生代码读取/保存 |
 | `POST /api/questions/{week}/{qid}/test` | 编译+仿真学生与参考代码，写result.json |
@@ -148,7 +148,7 @@ Verilog-Quiz-System/
 
 ```
 拉取 manifest.json
-  ├─ 失败/超时/schema非法 → 中止同步，不删任何本地数据，提示离线可用
+  ├─ 失败/超时/结构非法/schema_version不受支持 → 中止同步，不删任何本地数据，提示离线可用
   └─ 成功且校验通过
        ↓
 对账：
@@ -179,6 +179,8 @@ Verilog-Quiz-System/
 生成各自VCD → 保存result.json → 清除内存与临时明文
   ↓
 结果面板：编译/运行状态 + [查看期望波形] [查看你的波形] + RTL标签页
+  ↓
+"保存并继续"：跳转下一题（按列表顺序，与完成状态无关）；最后一题 → 跳转报告页
 ```
 
 ### 5. RTL 视图（v2 新功能）
@@ -189,14 +191,16 @@ Verilog-Quiz-System/
 - 学生代码含 `#delay`、`initial` 等行为级语法时 Yosys 报错 → 前端展示原始错误输出，并提示"RTL视图仅适用于可综合代码，仿真波形不受影响"；
 - 不使用 `yosys show`（依赖Graphviz，避免引入第四个外部工具）。
 
-### 6. 重做机制（不变）
+### 6. 重做机制
 
-已完成题目可随时重新进入，加载已有代码，修改后自动覆盖保存，重新测试更新 result.json；重新生成报告即覆盖本地文件。
+已尝试的题目可随时重新进入，加载已有代码，修改后自动覆盖保存，重新测试更新 result.json；重新进入报告页即重新生成报告。
+
+**进度语义**：程序不判断"完成"（测试通过不等于做对，判卷由老师人工进行），只记录**已尝试/未尝试**——保存过非默认内容的代码即为"已尝试"。周次页与题目导航只显示已尝试状态。
 
 ### 7. 报告生成流程
 
 ```
-点击"生成报告" → 读取draw_result.json确定题目顺序
+进入报告页 → 自动生成最新报告（覆盖旧报告）→ 读取draw_result.json确定题目顺序
   ↓
 逐题整合：题面（过滤图片语法）+ 学生代码 + 测试结果
   ↓
@@ -217,6 +221,13 @@ Verilog-Quiz-System/
 - 每次启动生成随机 token，前端所有请求在 header 中携带，后端校验；
 - 校验 Host 头，防 DNS rebinding；
 - Windows 打包为 windowed 模式（无控制台窗口），日志写文件且脱敏。
+
+### 生命周期（看门狗防残留）
+
+- 前端每 10s 发送 `/api/heartbeat`；任何 API 调用都会刷新存活时间；
+- 超过 120s 没有任何 API 活动（说明所有页面都已关闭）→ 后端自动退出，不产生后台残留进程；
+- 超时取值必须大于浏览器对后台标签页定时器的节流上限（通常 60s），防止标签页仅在后台未关闭时被误杀；可用环境变量 `VERILOG_QUIZ_WATCHDOG_TIMEOUT` 覆盖（测试用）；
+- 前端心跳连续失败 3 次 → 显示"后端已退出，请重新启动程序"遮罩。
 
 ### 代码持久化（重启不丢）
 
@@ -268,9 +279,9 @@ Windows 优先调用原生 iverilog/GTKWave，失败时 fallback 到 WSL（保�
 五个页面（单页应用，hash 路由）：
 
 1. **设置页**：学号（必填）、姓名、三个工具的手动路径覆盖（可选）、服务器连接测试；
-2. **周次列表页**：周次卡片（进度状态）、[检查更新]按钮、同步摘要弹窗（新增/更新/移除）、[打开数据目录]；
+2. **周次列表页**：周次卡片（已尝试进度）、[检查更新]按钮、同步摘要弹窗（新增/更新/移除）、[打开数据目录]；
 3. **答题页**：题面（Markdown渲染含图片）、CodeMirror 编辑器（Verilog高亮+行号）、testbench 只读区、测试按钮与结果面板（状态 + 波形两按钮 + RTL标签页）、[上一题][保存并继续]；
-4. **报告页**：报告预览、[生成报告]、[打开文件位置]；
+4. **报告页**：进入即自动生成最新报告（无生成按钮）、报告预览、[打开文件位置]；
 5. **诊断页**：四工具三级验证表格（状态灯/检测版本vs锁定版本/路径）、[运行自检]、[测试打开GTKWave]、[一键复制诊断信息]。
 
 ---
@@ -315,7 +326,7 @@ Windows 优先调用原生 iverilog/GTKWave，失败时 fallback 到 WSL（保�
 
 - 静态文件服务，按周次组织题目文件夹（folder 名如 q1, q2）；
 - 每道题：question.md、testbench.v、reference.v；
-- manifest.json 增加 `schema_version: 2`，info.json 格式不变。
+- manifest.json 与 info.json 格式均与 V1 一致，无需任何改动。
 
 ### 客户端
 

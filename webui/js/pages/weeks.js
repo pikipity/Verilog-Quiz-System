@@ -68,10 +68,7 @@ async function loadWeeks(listEl) {
   listEl.innerHTML = data.weeks.map(w => `
     <div class="card week-card">
       <span class="week-title">Week ${w.week}：${escapeHtml(w.title)}</span>
-      <span class="badge ${w.completed >= w.total && w.total > 0 ? 'done' : 'todo'}">
-        ${w.completed >= w.total && w.total > 0 ? '已完成' : '进行中'}
-      </span>
-      <div class="week-progress">完成 ${w.completed}/${w.total} 题　<a href="#/report/${w.week}">查看报告 →</a></div>
+      <div class="week-progress">已尝试 ${w.attempted}/${w.total} 题　<a href="#/report/${w.week}">查看报告 →</a></div>
       <div class="questions" data-week="${w.week}"></div>
     </div>
   `).join('');
@@ -83,7 +80,7 @@ async function loadWeeks(listEl) {
       el.innerHTML = data.questions.map(q => `
         <a class="question-row" href="#/question/${week}/${q.id}">
           <span>${escapeHtml(q.title)} <small>(${escapeHtml(q.id)})</small></span>
-          <span class="${q.completed ? 'status-done' : 'status-todo'}">${q.completed ? '● 已完成' : '○ 未完成'}</span>
+          <span class="${q.attempted ? 'status-done' : 'status-todo'}">${q.attempted ? '● 已尝试' : '○ 未尝试'}</span>
         </a>
       `).join('');
     } catch {

@@ -199,6 +199,26 @@ a.question-row:hover { background: #f8fafc; }
 }
 .check-detail { color: #6b7280; font-size: 13px; text-align: right; word-break: break-all; }
 
+#backend-lost {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+}
+
+#backend-lost .backend-lost-box {
+  background: #fff;
+  border-radius: 12px;
+  padding: 28px 36px;
+  font-size: 16px;
+  line-height: 1.8;
+  text-align: center;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.2);
+}
+
 .nav-bar {
   display: flex;
   justify-content: space-between;

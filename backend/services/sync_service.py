@@ -13,18 +13,28 @@ import config
 from core import question_manager as qm
 from backend.services import settings_service
 
-SUPPORTED_SCHEMA_VERSION = 2
+SUPPORTED_SCHEMA_VERSIONS = (2,)
 
 
-def _validate_manifest(manifest) -> bool:
+def _validate_manifest(manifest) -> tuple:
+    """
+    校验 manifest，返回 (ok, error)。
+
+    V1/V2 共用同一套题目与 manifest，schema_version 为可选字段：
+    - 不存在 → 按 V1 格式处理（仅结构校验）
+    - 存在 → 必须是受支持的版本号，否则中止
+    结构非法（非JSON对象、weeks缺失或格式错）一律中止。
+    """
     if not isinstance(manifest, dict):
-        return False
-    if manifest.get("schema_version") != SUPPORTED_SCHEMA_VERSION:
-        return False
+        return False, "manifest 不是合法 JSON 对象"
     weeks = manifest.get("weeks")
-    if not isinstance(weeks, list):
-        return False
-    return all(isinstance(w, str) and re.fullmatch(r'week\d+', w) for w in weeks)
+    if not isinstance(weeks, list) or not all(
+        isinstance(w, str) and re.fullmatch(r'week\d+', w) for w in weeks
+    ):
+        return False, "manifest.weeks 结构非法"
+    if "schema_version" in manifest and manifest["schema_version"] not in SUPPORTED_SCHEMA_VERSIONS:
+        return False, f"manifest schema_version 不受支持: {manifest['schema_version']}"
+    return True, ""
 
 
 def check_server() -> dict:
@@ -33,8 +43,9 @@ def check_server() -> dict:
         manifest = qm.fetch_json(f"{config.get_server_url()}/manifest.json")
     except Exception:
         return {"ok": False, "error": "无法连接题目服务器"}
-    if not _validate_manifest(manifest):
-        return {"ok": False, "error": "题目清单格式不兼容（需要 schema_version: 2），请联系老师更新"}
+    ok, error = _validate_manifest(manifest)
+    if not ok:
+        return {"ok": False, "error": f"题目清单格式不兼容（{error}），请联系老师检查 manifest"}
     return {"ok": True, "weeks": len(manifest["weeks"])}
 
 
@@ -57,8 +68,8 @@ def run_sync() -> dict:
     except Exception:
         return {"ok": False, "error": "无法连接题目服务器，本地数据未做任何改动"}
 
-    if not _validate_manifest(manifest):
-        return {"ok": False, "error": "题目清单格式不兼容（缺少或不支持的 schema_version），已中止同步，本地数据未改动"}
+    if not _validate_manifest(manifest)[0]:
+        return {"ok": False, "error": f"题目清单格式不兼容（{_validate_manifest(manifest)[1]}），已中止同步，本地数据未改动"}
 
     server_weeks = {int(w[4:]) for w in manifest["weeks"]}
     local_weeks = qm.scan_local_weeks()
@@ -100,7 +111,8 @@ def run_sync() -> dict:
 
 
 def list_weeks() -> list:
-    """周次列表（含进度）。"""
+    """周次列表（含"已尝试"进度）。"""
+    from backend.services import question_service
     result = []
     for w in sorted(qm.scan_local_weeks()):
         week_str = f"week{w}"
@@ -108,24 +120,20 @@ def list_weeks() -> list:
         draw = qm.read_json(os.path.join(config.QUESTIONS_DIR, week_str, "draw_result.json"), {}) or {}
         drawn = draw.get("drawn_questions", [])
 
-        completed = 0
-        for q in drawn:
-            prog = qm.read_json(os.path.join(
-                config.SUBMISSIONS_DIR, week_str, q.get("id", ""), "progress.json"))
-            if prog and prog.get("completed"):
-                completed += 1
+        attempted = sum(1 for q in drawn if question_service.is_attempted(w, q.get("id", "")))
 
         result.append({
             "week": w,
             "title": info.get("title", f"Week {w}"),
             "total": len(drawn),
-            "completed": completed,
+            "attempted": attempted,
         })
     return result
 
 
 def list_questions(week: int):
-    """某周抽中题目列表（含完成状态）。"""
+    """某周抽中题目列表（含"已尝试"状态）。"""
+    from backend.services import question_service
     week_str = f"week{week}"
     draw = qm.read_json(os.path.join(config.QUESTIONS_DIR, week_str, "draw_result.json"))
     if not draw:
@@ -134,11 +142,9 @@ def list_questions(week: int):
     questions = []
     for q in draw.get("drawn_questions", []):
         qid = q.get("id", "")
-        prog = qm.read_json(os.path.join(
-            config.SUBMISSIONS_DIR, week_str, qid, "progress.json"), {}) or {}
         questions.append({
             "id": qid,
             "title": q.get("title", ""),
-            "completed": bool(prog.get("completed")),
+            "attempted": question_service.is_attempted(week, qid),
         })
     return questions

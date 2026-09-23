@@ -7,14 +7,22 @@
 - 校验 Host 头防 DNS rebinding
 - 不写任何请求日志（脱敏）
 
-测试钩子（仅开发/CI）：VERILOG_QUIZ_PORT、VERILOG_QUIZ_TOKEN 环境变量
-可固定端口与 token，便于无头冒烟测试。
+生命周期：
+- 前端每 10s 发心跳（/api/heartbeat）；任何 API 调用都会刷新存活时间
+- 超过 WATCHDOG_TIMEOUT 没有任何 API 活动（所有页面已关闭）→ 自动退出，
+  避免后台残留。超时默认 120s：必须大于浏览器对后台标签页定时器的
+  节流上限（通常 60s），防止标签页仅在后台时被误杀。
+
+测试钩子（仅开发/CI）：VERILOG_QUIZ_PORT、VERILOG_QUIZ_TOKEN、
+VERILOG_QUIZ_WATCHDOG_TIMEOUT（秒）环境变量。
 """
 import json
 import os
 import re
 import secrets
 import sys
+import threading
+import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlparse, parse_qs
 
@@ -32,6 +40,10 @@ from backend.services import (
 )
 
 TOKEN = os.environ.get("VERILOG_QUIZ_TOKEN") or secrets.token_urlsafe(24)
+
+# 看门狗：超过该秒数没有任何 API 活动（所有页面已关闭）→ 自动退出
+WATCHDOG_TIMEOUT = float(os.environ.get("VERILOG_QUIZ_WATCHDOG_TIMEOUT", "120"))
+_last_activity = time.time()
 
 _CONTENT_TYPES = {
     '.html': 'text/html; charset=utf-8',
@@ -102,11 +114,16 @@ class QuizHandler(BaseHTTPRequestHandler):
 
     # ---------- 路由 ----------
 
+    def _refresh_activity(self):
+        global _last_activity
+        _last_activity = time.time()
+
     def do_GET(self):
         if not self._guard():
             return
         path = urlparse(self.path).path
         if path.startswith('/api/'):
+            self._refresh_activity()
             self._handle_api_get(path)
         else:
             self._serve_static(path)
@@ -114,11 +131,13 @@ class QuizHandler(BaseHTTPRequestHandler):
     def do_POST(self):
         if not self._guard():
             return
+        self._refresh_activity()
         self._handle_api_write(urlparse(self.path).path)
 
     def do_PUT(self):
         if not self._guard():
             return
+        self._refresh_activity()
         self._handle_api_write(urlparse(self.path).path)
 
     # ---------- GET API ----------
@@ -126,6 +145,9 @@ class QuizHandler(BaseHTTPRequestHandler):
     def _handle_api_get(self, path: str):
         if path == '/api/health':
             self._send_json({"ok": True, "version": config.VERSION})
+            return
+        if path == '/api/heartbeat':
+            self._send_json({"ok": True})
             return
         if path == '/api/settings':
             settings = settings_service.load_settings()
@@ -203,7 +225,7 @@ class QuizHandler(BaseHTTPRequestHandler):
                 self._send_json(report_service.open_reports_folder())
             return
 
-        m = re.fullmatch(r'/api/questions/(\d+)/([\w-]+)/(test|complete|gtkwave|code|rtl)', path)
+        m = re.fullmatch(r'/api/questions/(\d+)/([\w-]+)/(test|gtkwave|code|rtl)', path)
         if not m:
             self._send_json({"error": "not found"}, 404)
             return
@@ -217,8 +239,6 @@ class QuizHandler(BaseHTTPRequestHandler):
             self._send_json(question_service.save_code(week, qid, str(body.get("code", ""))))
         elif action == 'test' and self.command == 'POST':
             self._send_json(question_service.run_test(week, qid, str(body.get("code", ""))))
-        elif action == 'complete' and self.command == 'POST':
-            self._send_json(question_service.set_completed(week, qid))
         elif action == 'gtkwave' and self.command == 'POST':
             which = parse_qs(urlparse(self.path).query).get('which', ['student'])[0]
             self._send_json(question_service.open_gtkwave(week, qid, which))
@@ -259,9 +279,19 @@ class QuizHandler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
 
+def _watchdog(server):
+    """超时无 API 活动（所有页面已关闭）则关闭服务，避免后台残留。"""
+    while True:
+        time.sleep(10)
+        if time.time() - _last_activity > WATCHDOG_TIMEOUT:
+            threading.Thread(target=server.shutdown, daemon=True).start()
+            return
+
+
 def create_server(host: str = '127.0.0.1', port: int = None):
     """创建本地服务。端口默认由系统分配，可用 VERILOG_QUIZ_PORT 固定（测试用）。"""
     if port is None:
         port = int(os.environ.get("VERILOG_QUIZ_PORT", "0"))
     server = ThreadingHTTPServer((host, port), QuizHandler)
+    threading.Thread(target=_watchdog, args=(server,), daemon=True).start()
     return server, server.server_address[1]

@@ -23,7 +23,7 @@ export async function renderQuestion(root, week, qid) {
     <div class="qnav">
       ${questions.map((q, i) => `
         <a href="#/question/${week}/${q.id}" class="${q.id === qid ? 'cur' : ''}">
-          ${i + 1}. ${escapeHtml(q.title)} ${q.completed ? '●' : '○'}
+          ${i + 1}. ${escapeHtml(q.title)} ${q.attempted ? '●' : '○'}
         </a>`).join('')}
     </div>
     <div class="card">
@@ -80,10 +80,12 @@ export async function renderQuestion(root, week, qid) {
   document.getElementById('gen-rtl').addEventListener('click', generateRtl);
   document.getElementById('save-continue').addEventListener('click', async () => {
     await saveCode();
-    await api(`/api/questions/${week}/${qid}/complete`, { method: 'POST' });
-    const next = questions.find((q, i) => i > idx && !q.completed)
-      || questions.find(q => !q.completed);
-    location.hash = next ? `#/question/${week}/${next.id}` : '#/weeks';
+    // 纯位置导航：进下一题；最后一题跳报告页
+    if (idx + 1 < questions.length) {
+      location.hash = `#/question/${week}/${questions[idx + 1].id}`;
+    } else {
+      location.hash = `#/report/${week}`;
+    }
   });
   document.getElementById('prev-btn').addEventListener('click', async () => {
     await saveCode();
@@ -222,6 +224,7 @@ async function generateRtl() {
     });
     msg.className = 'msg ok';
     msg.textContent = '已生成，可拖拽缩放查看。';
+    container.scrollIntoView({ behavior: 'smooth', block: 'center' });
   } catch (e) {
     msg.className = 'msg err';
     msg.textContent = '生成失败：' + e.message;

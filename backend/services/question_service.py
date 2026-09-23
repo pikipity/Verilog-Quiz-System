@@ -91,21 +91,33 @@ def get_code(week, qid):
 
 
 def save_code(week, qid, code: str):
+    """
+    保存学生代码。内容为空或与默认模板一致时不写入（不计为"已尝试"）。
+    "已尝试"的判定：存在非默认内容的代码文件。
+    """
+    stripped = code.strip()
+    if not stripped or stripped == _DEFAULT_CODE.strip():
+        return {"saved": True, "written": False, "time": datetime.now().strftime("%H:%M:%S")}
+
     sub_dir = _submission_dir(week, qid)
     os.makedirs(sub_dir, exist_ok=True)
     with open(os.path.join(sub_dir, f"{qid}.v"), 'w', encoding='utf-8', newline='\n') as f:
         f.write(code)
     _update_progress(week, qid)
-    return {"saved": True, "time": datetime.now().strftime("%H:%M:%S")}
+    return {"saved": True, "written": True, "time": datetime.now().strftime("%H:%M:%S")}
 
 
-def _update_progress(week, qid, completed=None):
+def is_attempted(week, qid) -> bool:
+    """已尝试 = 存在保存过的代码文件。"""
+    return os.path.exists(os.path.join(_submission_dir(week, qid), f"{qid}.v"))
+
+
+def _update_progress(week, qid):
+    """记录最后保存时间，并刷新周级进度汇总。"""
     sub_dir = _submission_dir(week, qid)
     os.makedirs(sub_dir, exist_ok=True)
     prog_file = os.path.join(sub_dir, "progress.json")
     prog = qm.read_json(prog_file, {}) or {}
-    if completed is not None:
-        prog["completed"] = bool(completed)
     prog["last_saved"] = datetime.now().isoformat()
     with open(prog_file, 'w', encoding='utf-8') as f:
         json.dump(prog, f, ensure_ascii=False, indent=2)
@@ -113,31 +125,21 @@ def _update_progress(week, qid, completed=None):
 
 
 def _update_week_progress(week):
-    """周级进度汇总 submissions/weekN/progress.json。"""
+    """周级进度汇总 submissions/weekN/progress.json（按"已尝试"统计）。"""
     week_str = _week_str(week)
     draw = qm.read_json(os.path.join(config.QUESTIONS_DIR, week_str, "draw_result.json"), {}) or {}
     drawn = draw.get("drawn_questions", [])
-    completed = 0
-    for q in drawn:
-        prog = qm.read_json(os.path.join(
-            config.SUBMISSIONS_DIR, week_str, q.get("id", ""), "progress.json"), {}) or {}
-        if prog.get("completed"):
-            completed += 1
+    attempted = sum(1 for q in drawn if is_attempted(week, q.get("id", "")))
     week_prog = {
         "week": int(week),
         "total": len(drawn),
-        "completed": completed,
+        "attempted": attempted,
         "updated_at": datetime.now().isoformat(),
     }
     week_dir = os.path.join(config.SUBMISSIONS_DIR, week_str)
     os.makedirs(week_dir, exist_ok=True)
     with open(os.path.join(week_dir, "progress.json"), 'w', encoding='utf-8') as f:
         json.dump(week_prog, f, ensure_ascii=False, indent=2)
-
-
-def set_completed(week, qid):
-    _update_progress(week, qid, completed=True)
-    return {"completed": True}
 
 
 # ---------- 仿真测试 ----------

@@ -1,4 +1,4 @@
-import { initToken, api } from './api.js';
+import { initToken, startHeartbeat, api } from './api.js';
 import { renderSettings } from './pages/settings.js';
 import { renderWeeks } from './pages/weeks.js';
 import { renderQuestion } from './pages/question.js';
@@ -42,20 +42,24 @@ async function route() {
     const qm = hash.match(/^#\/question\/(\d+)\/([\w-]+)$/);
     if (qm) {
       await renderQuestion(app, parseInt(qm[1], 10), qm[2]);
+      window.scrollTo(0, 0);
       return;
     }
     const rm = hash.match(/^#\/report\/(\d+)$/);
     if (rm) {
       await renderReport(app, parseInt(rm[1], 10));
+      window.scrollTo(0, 0);
       return;
     }
     const page = routes[hash] || renderWeeks;
     await page(app);
+    window.scrollTo(0, 0);
   } catch (e) {
     app.innerHTML = `<div class="card"><p class="msg err">${e.message}</p></div>`;
   }
 }
 
 initToken();
+startHeartbeat();
 window.addEventListener('hashchange', route);
 route();

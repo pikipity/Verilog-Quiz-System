@@ -233,8 +233,8 @@ yosys -V
 1. **题目选择** / **Question Selection**
    - 界面顶部显示所有题目，可快速跳转
    - All questions are displayed at the top for quick navigation
-   - 当前题目高亮显示，已完成的题目显示 ● 标记
-   - Current question is highlighted; completed questions show ●
+   - 当前题目高亮显示，已尝试的题目（保存过代码）显示 ● 标记
+   - Current question is highlighted; attempted questions (code saved) show ●
 
 2. **查看题目** / **View Question**
    - 阅读题目描述，了解功能要求和端口定义
@@ -269,19 +269,21 @@ yosys -V
    - Note: only synthesizable code can produce an RTL diagram; code with `#delay` or `initial` will fail — this does not affect simulation
 
 8. **保存继续** / **Save and Continue**
-   - 测试通过后，点击 **"保存并继续"** 进入下一题
-   - After the test passes, click **"Save and Continue"** to proceed
-   - 已完成的题目可以随时重新进入修改（重做），重新测试即可
-   - Completed questions can be reopened and modified at any time; just re-run the test
+   - 点击 **"保存并继续"** 进入下一题；最后一题将进入报告页
+   - Click **"Save and Continue"** to go to the next question; the last question leads to the report page
+   - 已尝试过的题目可以随时重新进入修改（重做），重新测试即可
+   - Attempted questions can be reopened and modified at any time; just re-run the test
 
 ### 生成报告 / Generate Report
 
-完成所有题目后：
+完成题目后：
 
-After completing all questions:
+After completing the questions:
 
-1. 在周次页面点击 **"查看报告 →"**，然后点击 **"生成报告"**
-   - On the Weeks page, click **"View Report →"**, then click **"Generate Report"**
+1. 在周次页面点击 **"查看报告 →"** 进入报告页，程序会**自动生成最新报告**
+   - On the Weeks page, click **"View Report →"** to open the report page; the app **automatically generates the latest report**
+   - 无需点击任何按钮：每次进入报告页都会重新生成并覆盖旧报告，报告始终反映你的最新代码与测试结果
+   - No button needed: every time you open the report page, it regenerates and overwrites the old report — the report always reflects your latest code and test results
 
 2. 报告包含你的学号姓名、每题的题目描述、你的代码、测试结果，以及你的输出与标准答案的**逐时刻数值对比表**
    - The report contains your student ID and name, each question's description, your code, test results, and a **cycle-by-cycle value comparison table** between your output and the reference
@@ -292,8 +294,8 @@ After completing all questions:
 4. 手动将报告文件提交到学校作业系统
    - Manually submit the report file to the school assignment system
 
-5. 如果重做了某道题，重新 **"生成报告"** 即可（自动覆盖旧报告）
-   - If you redo a question, simply **"Generate Report"** again (the old report is overwritten)
+5. 如果重做了某道题，重新进入报告页即可获得更新后的报告
+   - If you redo a question, simply reopen the report page to get the updated report
 
 ### 查看数据目录 / View Data Directory
 
@@ -336,6 +338,20 @@ Verilog-Quiz/
 2. 在"设置"页点击 **"测试服务器连接"** 确认服务器状态
 3. 已下载过的题目离线也能继续做，联网后重新"检查更新"即可
 4. 联系助教确认服务器状态
+
+### Q2b: 界面显示"本地后端已退出或无法连接"
+
+**A:**
+
+以下情况程序会**自动退出**（防止后台残留），均属正常设计：
+
+- 关闭所有页面超过约 2 分钟；
+- 电脑睡眠/锁屏超过约 2 分钟；
+- 浏览器因内存不足自动卸载了长时间后台的标签页。
+
+重新双击运行程序即可，代码和进度不会丢失（代码保存在磁盘上，与浏览器无关）。
+
+The app **exits automatically** (to avoid background residue) when: all pages are closed for ~2 minutes, the computer sleeps for ~2 minutes, or the browser discards a long-inactive tab under memory pressure. This is by design. Just relaunch the app — your code and progress are preserved on disk.
 
 ### Q3: Windows 提示 "Windows 已保护你的电脑" (SmartScreen)
 

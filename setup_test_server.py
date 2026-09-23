@@ -63,9 +63,9 @@ def create_test_data():
         }
     ]
     
-    # manifest.json（v2 格式，含 schema_version 闸门）
+    # manifest.json（V1 格式：V1/V2 共用同一套题目，schema_version 为可选字段，此处按生产环境不写）
     manifest = {
-        "schema_version": 2,
+        "version": "1.0",
         "weeks": ["week1", "week2", "week3"]
     }
     with open(f"{base_dir}/manifest.json", "w", encoding='utf-8') as f:

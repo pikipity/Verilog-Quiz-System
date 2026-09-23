@@ -6,48 +6,46 @@ export async function renderReport(root, week) {
     <div class="page-head">
       <h2>Week ${week} 报告</h2>
       <div class="actions">
-        <button id="gen-report">生成报告</button>
         <button class="secondary" id="open-folder">打开文件位置</button>
         <button class="secondary" id="back-weeks">返回周次</button>
       </div>
     </div>
-    <p id="report-msg" class="msg"></p>
+    <p id="report-msg" class="msg">正在生成最新报告…</p>
     <div class="card" id="report-preview">加载中…</div>
   `;
 
   const msg = root.querySelector('#report-msg');
   const preview = root.querySelector('#report-preview');
 
-  async function loadPreview() {
-    const data = await api(`/api/reports/${week}`);
-    if (!data.exists) {
-      preview.innerHTML = '<p class="empty">还没有生成报告。完成题目后点击"生成报告"。</p>';
-      return;
+  // 进入页面即自动生成最新报告（自动覆盖旧报告）
+  let genError = '';
+  try {
+    const r = await api(`/api/reports/${week}/generate`, { method: 'POST' });
+    if (r.ok) {
+      msg.className = 'msg ok';
+      msg.textContent = `已生成最新报告 ${r.filename}（每次进入本页自动更新）`;
+    } else {
+      genError = r.error;
     }
-    preview.innerHTML =
-      `<p class="hint-text">${escapeHtml(data.filename)}</p>` +
-      `<div class="markdown">${DOMPurify.sanitize(marked.parse(data.content))}</div>`;
+  } catch (e) {
+    genError = e.message;
   }
 
-  await loadPreview();
+  if (genError) {
+    msg.className = 'msg err';
+    msg.textContent = `报告生成失败：${genError}`;
+  }
 
-  root.querySelector('#gen-report').addEventListener('click', async (e) => {
-    const btn = e.target;
-    btn.disabled = true;
-    btn.textContent = '生成中…';
-    try {
-      const r = await api(`/api/reports/${week}/generate`, { method: 'POST' });
-      msg.className = r.ok ? 'msg ok' : 'msg err';
-      msg.textContent = r.ok ? `已生成 ${r.filename}（重做后重新生成即覆盖）` : r.error;
-      await loadPreview();
-    } catch (err) {
-      msg.className = 'msg err';
-      msg.textContent = err.message;
-    } finally {
-      btn.disabled = false;
-      btn.textContent = '生成报告';
-    }
-  });
+  // 加载预览（生成失败时若存在旧报告仍展示）
+  try {
+    const data = await api(`/api/reports/${week}`);
+    preview.innerHTML = data.exists
+      ? `<p class="hint-text">${escapeHtml(data.filename)}</p>` +
+        `<div class="markdown">${DOMPurify.sanitize(marked.parse(data.content))}</div>`
+      : '<p class="empty">还没有报告数据。完成题目并运行测试后，进入本页会自动生成报告。</p>';
+  } catch (e) {
+    preview.innerHTML = `<p class="msg err">${escapeHtml(e.message)}</p>`;
+  }
 
   root.querySelector('#open-folder').addEventListener('click', async () => {
     try {
