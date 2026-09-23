@@ -63,40 +63,52 @@ def create_test_data():
         }
     ]
     
-    # manifest.json
+    # manifest.json（v2 格式，含 schema_version 闸门）
     manifest = {
-        "version": "1.0",
-        "weeks": ["week1"]
+        "schema_version": 2,
+        "weeks": ["week1", "week2", "week3"]
     }
     with open(f"{base_dir}/manifest.json", "w", encoding='utf-8') as f:
         json.dump(manifest, f, indent=2)
+
+    # 每周的 info.json 与题目（info.json 只在不存在时创建，便于手动修改测试更新场景）
+    for week_num in (1, 2, 3):
+        week_dir = f"{base_dir}/week{week_num}"
+        os.makedirs(week_dir, exist_ok=True)
+
+        info_file = f"{week_dir}/info.json"
+        if not os.path.exists(info_file):
+            from datetime import datetime
+            info = {
+                "week": week_num,
+                "title": f"第{week_num}周 组合逻辑测试",
+                "updated_at": datetime.now().strftime("%Y-%m-%dT%H:%M:%S"),
+                "questions": [
+                    {"id": q['id'], "folder": q['folder'], "title": q['title']}
+                    for q in questions_data
+                ],
+                "select_count": 2
+            }
+            with open(info_file, "w", encoding='utf-8') as f:
+                json.dump(info, f, ensure_ascii=False, indent=2)
+            print(f"Created: {info_file}")
+        else:
+            print(f"Skipped (exists): {info_file}")
     
-    # week1/info.json（新格式，带时间戳）- 只在不存在时创建
-    week1_dir = f"{base_dir}/week1"
-    os.makedirs(week1_dir, exist_ok=True)
-    
-    info_file = f"{week1_dir}/info.json"
-    if not os.path.exists(info_file):
-        from datetime import datetime
-        info = {
-            "week": 1,
-            "title": "组合逻辑基础测试",
-            "updated_at": datetime.now().strftime("%Y-%m-%dT%H:%M:%S"),
-            "questions": [
-                {"id": q['id'], "folder": q['folder'], "title": q['title']}
-                for q in questions_data
-            ],
-            "select_count": 2
-        }
-        with open(info_file, "w", encoding='utf-8') as f:
-            json.dump(info, f, ensure_ascii=False, indent=2)
-        print(f"Created: {info_file}")
-    else:
-        print(f"Skipped (exists): {info_file}")
-    
-    # 创建每道题的文件夹（使用folder名）
+    # 创建每道题的文件夹（使用folder名），三个week复用同一组题
+    for week_num in (1, 2, 3):
+        week_dir = f"{base_dir}/week{week_num}"
+        _create_questions_for_week(week_dir, questions_data)
+
+    print(f"✓ 测试数据已创建: {base_dir}")
+    print("  使用新ID格式:")
     for q in questions_data:
-        q_dir = f"{week1_dir}/{q['folder']}"
+        print(f"    - {q['id']} (folder: {q['folder']})")
+
+
+def _create_questions_for_week(week_dir, questions_data):
+    for q in questions_data:
+        q_dir = f"{week_dir}/{q['folder']}"
         os.makedirs(q_dir, exist_ok=True)
         
         # question.md - 只在不存在时创建
@@ -220,11 +232,6 @@ endmodule
             with open(tb_file, "w", encoding='utf-8') as f:
                 f.write(tb)
             print(f"Created: {tb_file}")
-    
-    print(f"✓ 测试数据已创建: {base_dir}")
-    print("  使用新ID格式:")
-    for q in questions_data:
-        print(f"    - {q['id']} (folder: {q['folder']})")
 
 
 def start_server():
@@ -251,8 +258,9 @@ def start_server():
 
 if __name__ == "__main__":
     create_test_data()
-    
-    print("\n修改 config.py 中的 SERVER_URL 为: http://localhost:8080/verilog-quiz")
+
+    print("\n运行主程序时设置环境变量指向本服务器:")
+    print("  VERILOG_QUIZ_SERVER_URL=http://localhost:8080/verilog-quiz")
     print("\n启动服务器...")
-    
+
     start_server()

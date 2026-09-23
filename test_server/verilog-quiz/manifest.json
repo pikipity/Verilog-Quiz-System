@@ -1,7 +1,6 @@
 {
-  "version": "1.0",
+  "schema_version": 2,
   "weeks": [
-    "week1",
-    "week2"
+    "week1"
   ]
 }

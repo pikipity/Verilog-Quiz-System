@@ -1,7 +1,7 @@
 {
   "week": 1,
-  "title": "组合逻辑基础测试",
-  "updated_at": "2026-04-18T11:30:37",
+  "title": "第1周 组合逻辑测试",
+  "updated_at": "2026-12-31T00:00:00",
   "questions": [
     {
       "id": "mux2to1_v1",
@@ -12,12 +12,7 @@
       "id": "and2_v1",
       "folder": "q2",
       "title": "2输入与门"
-    },
-    {
-      "id": "halfadder_v1",
-      "folder": "q3",
-      "title": "半加器"
     }
   ],
-  "select_count": 3
+  "select_count": 2
 }

@@ -12,6 +12,7 @@
 """
 import json
 import os
+import re
 import secrets
 import sys
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -21,6 +22,7 @@ from urllib.parse import urlparse
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import config
+from backend.services import settings_service, sync_service
 
 TOKEN = os.environ.get("VERILOG_QUIZ_TOKEN") or secrets.token_urlsafe(24)
 
@@ -106,14 +108,50 @@ class QuizHandler(BaseHTTPRequestHandler):
 
     # ---------- API ----------
 
+    def _read_body(self):
+        """读取 JSON 请求体；非法返回 None。"""
+        length = int(self.headers.get('Content-Length') or 0)
+        if length <= 0:
+            return {}
+        try:
+            return json.loads(self.rfile.read(length).decode('utf-8'))
+        except (json.JSONDecodeError, UnicodeDecodeError):
+            return None
+
     def _handle_api_get(self, path: str):
         if path == '/api/health':
             self._send_json({"ok": True, "version": config.VERSION})
+        elif path == '/api/settings':
+            settings = settings_service.load_settings()
+            settings["configured"] = bool(settings["student_id"].strip())
+            self._send_json(settings)
+        elif path == '/api/weeks':
+            self._send_json({"weeks": sync_service.list_weeks()})
         else:
-            self._send_json({"error": "not found"}, 404)
+            m = re.fullmatch(r'/api/weeks/(\d+)/questions', path)
+            if m:
+                questions = sync_service.list_questions(int(m.group(1)))
+                if questions is None:
+                    self._send_json({"error": "not found"}, 404)
+                else:
+                    self._send_json({"questions": questions})
+            else:
+                self._send_json({"error": "not found"}, 404)
 
     def _handle_api_post(self, path: str):
-        self._send_json({"error": "not found"}, 404)
+        if path == '/api/sync' and self.command == 'POST':
+            self._send_json(sync_service.run_sync())
+        elif path == '/api/server/check' and self.command == 'POST':
+            self._send_json(sync_service.check_server())
+        elif path == '/api/settings' and self.command == 'PUT':
+            body = self._read_body()
+            if body is None:
+                self._send_json({"error": "请求体不是合法 JSON"}, 400)
+            else:
+                result = settings_service.save_settings(body)
+                self._send_json(result, 200 if result.get("saved") else 400)
+        else:
+            self._send_json({"error": "not found"}, 404)
 
     # ---------- 静态文件 ----------
 

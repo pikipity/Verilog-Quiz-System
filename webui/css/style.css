@@ -1,0 +1,125 @@
+* { box-sizing: border-box; }
+
+body {
+  font-family: "Segoe UI", "Microsoft YaHei", sans-serif;
+  margin: 0;
+  background: #f5f6f8;
+  color: #222;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 24px;
+  background: #1f2937;
+  color: #fff;
+}
+
+.topbar .brand { font-weight: 600; font-size: 16px; }
+
+.topbar nav a {
+  color: #cbd5e1;
+  text-decoration: none;
+  margin-left: 16px;
+  font-size: 14px;
+}
+
+.topbar nav a:hover { color: #fff; }
+
+main {
+  max-width: 860px;
+  margin: 24px auto;
+  padding: 0 20px;
+}
+
+h2 { font-size: 20px; margin: 0 0 16px; }
+
+.card {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 16px 20px;
+  margin-bottom: 14px;
+}
+
+.form label {
+  display: block;
+  margin-bottom: 12px;
+  font-size: 14px;
+}
+
+.form input {
+  display: block;
+  width: 100%;
+  margin-top: 4px;
+  padding: 8px 10px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 14px;
+}
+
+.form fieldset {
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  margin: 0 0 12px;
+  padding: 12px;
+}
+
+.form legend { font-size: 13px; color: #6b7280; padding: 0 6px; }
+
+.req { color: #c5221f; }
+
+.actions { display: flex; gap: 10px; margin-top: 4px; }
+
+button {
+  padding: 8px 18px;
+  border: 1px solid #2563eb;
+  background: #2563eb;
+  color: #fff;
+  border-radius: 6px;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+button.secondary { background: #fff; color: #2563eb; }
+
+button:disabled { opacity: 0.5; cursor: default; }
+
+.msg { font-size: 13px; margin-top: 10px; min-height: 18px; }
+.msg.ok { color: #137333; }
+.msg.err { color: #c5221f; }
+
+.page-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.page-head h2 { margin: 0; }
+
+.week-card .week-title { font-size: 16px; font-weight: 600; }
+.week-card .week-progress { font-size: 13px; color: #6b7280; margin-top: 4px; }
+.week-card .badge { font-size: 12px; padding: 2px 8px; border-radius: 10px; margin-left: 8px; }
+.week-card .badge.done { background: #e6f4ea; color: #137333; }
+.week-card .badge.todo { background: #fef7e0; color: #b06000; }
+
+.question-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 4px;
+  border-top: 1px solid #f0f0f0;
+  font-size: 14px;
+}
+
+.question-row .status-done { color: #137333; }
+.question-row .status-todo { color: #9ca3af; }
+
+.sync-summary { font-size: 14px; }
+.sync-summary .added { color: #137333; }
+.sync-summary .updated { color: #b06000; }
+.sync-summary .removed { color: #c5221f; }
+.sync-summary .errors { color: #c5221f; }
+
+.empty { color: #9ca3af; font-size: 14px; padding: 24px 0; text-align: center; }

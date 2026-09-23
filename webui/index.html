@@ -4,36 +4,17 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Verilog Quiz System</title>
-<style>
-  body { font-family: "Segoe UI", "Microsoft YaHei", sans-serif; max-width: 720px; margin: 60px auto; padding: 0 20px; color: #222; }
-  h1 { font-size: 24px; }
-  #status { padding: 12px 16px; border-radius: 8px; background: #f0f0f0; }
-  #status.ok { background: #e6f4ea; color: #137333; }
-  #status.err { background: #fce8e6; color: #c5221f; }
-  .ver { color: #888; font-size: 13px; margin-top: 24px; }
-</style>
+<link rel="stylesheet" href="/css/style.css">
 </head>
 <body>
-<h1>Verilog Quiz System</h1>
-<div id="status">正在连接本地后端…</div>
-<p class="ver">M1 骨架页面 — 后续里程碑将替换为完整界面</p>
-<script>
-  const token = new URLSearchParams(location.search).get('token') || '';
-  history.replaceState(null, '', location.pathname);
-  sessionStorage.setItem('quiz_token', token);
-
-  fetch('/api/health', { headers: { 'X-Quiz-Token': sessionStorage.getItem('quiz_token') } })
-    .then(r => r.json())
-    .then(d => {
-      const el = document.getElementById('status');
-      if (d.ok) { el.textContent = '后端连接正常 · 版本 ' + d.version; el.classList.add('ok'); }
-      else { el.textContent = '后端返回异常'; el.classList.add('err'); }
-    })
-    .catch(() => {
-      const el = document.getElementById('status');
-      el.textContent = '无法连接本地后端';
-      el.classList.add('err');
-    });
-</script>
+<header class="topbar">
+  <span class="brand">Verilog Quiz System</span>
+  <nav id="nav">
+    <a href="#/weeks">周次</a>
+    <a href="#/settings">设置</a>
+  </nav>
+</header>
+<main id="app">加载中…</main>
+<script type="module" src="/js/app.js"></script>
 </body>
 </html>

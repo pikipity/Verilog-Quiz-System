@@ -1,0 +1,9 @@
+{
+  "student_id": "2023001",
+  "name": "ZhangSan",
+  "tool_paths": {
+    "iverilog": "",
+    "gtkwave": "",
+    "yosys": ""
+  }
+}
