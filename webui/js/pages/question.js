@@ -40,6 +40,15 @@ export async function renderQuestion(root, week, qid) {
     </div>
     <div class="card" id="result-card" style="display:none"></div>
     <div class="card">
+      <h3>RTL 视图</h3>
+      <p class="hint-text">由 Yosys 根据你的代码生成门级电路图（不包含参考代码）。</p>
+      <div class="actions">
+        <button class="secondary" id="gen-rtl">生成 RTL 视图</button>
+      </div>
+      <p id="rtl-msg" class="msg"></p>
+      <div id="rtl-container" style="display:none"></div>
+    </div>
+    <div class="card">
       <h3>Testbench（只读）</h3>
       <pre class="tb">${escapeHtml(question.testbench)}</pre>
     </div>
@@ -68,6 +77,7 @@ export async function renderQuestion(root, week, qid) {
   };
 
   document.getElementById('run-test').addEventListener('click', runTest);
+  document.getElementById('gen-rtl').addEventListener('click', generateRtl);
   document.getElementById('save-continue').addEventListener('click', async () => {
     await saveCode();
     await api(`/api/questions/${week}/${qid}/complete`, { method: 'POST' });
@@ -170,5 +180,53 @@ async function openWave(which) {
   } catch (e) {
     msg.className = 'msg err';
     msg.textContent = e.message;
+  }
+}
+
+let skinCache = null;
+
+async function generateRtl() {
+  if (!currentCtx) return;
+  const { week, qid } = currentCtx;
+  const btn = document.getElementById('gen-rtl');
+  const msg = document.getElementById('rtl-msg');
+  const container = document.getElementById('rtl-container');
+
+  btn.disabled = true;
+  btn.textContent = '生成中…';
+  msg.className = 'msg';
+  msg.textContent = '';
+  container.style.display = 'none';
+  container.innerHTML = '';
+
+  try {
+    await saveCode();  // 确保 yosys 读到最新代码
+    const data = await api(`/api/questions/${week}/${qid}/rtl`, { method: 'POST' });
+    if (!data.ok) {
+      msg.className = 'msg err';
+      msg.textContent = data.error + (data.hint ? `\n${data.hint}` : '');
+      return;
+    }
+
+    if (!skinCache) {
+      skinCache = await fetch('/vendor/netlistsvg/default.svg').then(r => r.text());
+    }
+    const svgText = await netlistsvg.render(skinCache, data.netlist);
+    container.innerHTML = svgText;
+    container.style.display = '';
+    svgPanZoom(container.querySelector('svg'), {
+      zoomEnabled: true,
+      controlIconsEnabled: true,
+      fit: true,
+      center: true,
+    });
+    msg.className = 'msg ok';
+    msg.textContent = '已生成，可拖拽缩放查看。';
+  } catch (e) {
+    msg.className = 'msg err';
+    msg.textContent = '生成失败：' + e.message;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '生成 RTL 视图';
   }
 }

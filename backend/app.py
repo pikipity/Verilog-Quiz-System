@@ -22,7 +22,7 @@ from urllib.parse import urlparse, parse_qs
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import config
-from backend.services import settings_service, sync_service, question_service
+from backend.services import settings_service, sync_service, question_service, yosys_service
 
 TOKEN = os.environ.get("VERILOG_QUIZ_TOKEN") or secrets.token_urlsafe(24)
 
@@ -167,7 +167,7 @@ class QuizHandler(BaseHTTPRequestHandler):
                 self._send_json(result, 200 if result.get("saved") else 400)
             return
         else:
-            m = re.fullmatch(r'/api/questions/(\d+)/([\w-]+)/(test|complete|gtkwave|code)', path)
+            m = re.fullmatch(r'/api/questions/(\d+)/([\w-]+)/(test|complete|gtkwave|code|rtl)', path)
             if not m:
                 self._send_json({"error": "not found"}, 404)
                 return
@@ -186,6 +186,8 @@ class QuizHandler(BaseHTTPRequestHandler):
             elif action == 'gtkwave' and self.command == 'POST':
                 which = parse_qs(urlparse(self.path).query).get('which', ['student'])[0]
                 self._send_json(question_service.open_gtkwave(week, qid, which))
+            elif action == 'rtl' and self.command == 'POST':
+                self._send_json(yosys_service.generate_rtl(week, qid))
             else:
                 self._send_json({"error": "not found"}, 404)
 
