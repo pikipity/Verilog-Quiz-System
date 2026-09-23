@@ -16,13 +16,13 @@ import re
 import secrets
 import sys
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from urllib.parse import urlparse
+from urllib.parse import urlparse, parse_qs
 
 # 兼容直接运行与 PyInstaller 打包两种形态
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import config
-from backend.services import settings_service, sync_service
+from backend.services import settings_service, sync_service, question_service
 
 TOKEN = os.environ.get("VERILOG_QUIZ_TOKEN") or secrets.token_urlsafe(24)
 
@@ -135,6 +135,21 @@ class QuizHandler(BaseHTTPRequestHandler):
                     self._send_json({"error": "not found"}, 404)
                 else:
                     self._send_json({"questions": questions})
+                return
+
+            m = re.fullmatch(r'/api/questions/(\d+)/([\w-]+)(/code|/result)?', path)
+            if m:
+                week, qid, suffix = int(m.group(1)), m.group(2), m.group(3)
+                if suffix is None:
+                    data = question_service.get_question(week, qid)
+                elif suffix == '/code':
+                    data = question_service.get_code(week, qid)
+                else:
+                    data = question_service.get_result(week, qid)
+                if data is None:
+                    self._send_json({"error": "not found"}, 404)
+                else:
+                    self._send_json(data)
             else:
                 self._send_json({"error": "not found"}, 404)
 
@@ -150,8 +165,29 @@ class QuizHandler(BaseHTTPRequestHandler):
             else:
                 result = settings_service.save_settings(body)
                 self._send_json(result, 200 if result.get("saved") else 400)
+            return
         else:
-            self._send_json({"error": "not found"}, 404)
+            m = re.fullmatch(r'/api/questions/(\d+)/([\w-]+)/(test|complete|gtkwave|code)', path)
+            if not m:
+                self._send_json({"error": "not found"}, 404)
+                return
+            week, qid, action = int(m.group(1)), m.group(2), m.group(3)
+            body = self._read_body()
+            if body is None:
+                self._send_json({"error": "请求体不是合法 JSON"}, 400)
+                return
+
+            if action == 'code' and self.command == 'PUT':
+                self._send_json(question_service.save_code(week, qid, str(body.get("code", ""))))
+            elif action == 'test' and self.command == 'POST':
+                self._send_json(question_service.run_test(week, qid, str(body.get("code", ""))))
+            elif action == 'complete' and self.command == 'POST':
+                self._send_json(question_service.set_completed(week, qid))
+            elif action == 'gtkwave' and self.command == 'POST':
+                which = parse_qs(urlparse(self.path).query).get('which', ['student'])[0]
+                self._send_json(question_service.open_gtkwave(week, qid, which))
+            else:
+                self._send_json({"error": "not found"}, 404)
 
     # ---------- 静态文件 ----------
 

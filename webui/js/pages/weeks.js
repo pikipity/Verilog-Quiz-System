@@ -81,10 +81,10 @@ async function loadWeeks(listEl) {
     try {
       const data = await api(`/api/weeks/${week}/questions`);
       el.innerHTML = data.questions.map(q => `
-        <div class="question-row">
+        <a class="question-row" href="#/question/${week}/${q.id}">
           <span>${escapeHtml(q.title)} <small>(${escapeHtml(q.id)})</small></span>
           <span class="${q.completed ? 'status-done' : 'status-todo'}">${q.completed ? '● 已完成' : '○ 未完成'}</span>
-        </div>
+        </a>
       `).join('');
     } catch {
       el.innerHTML = '<div class="question-row">题目信息读取失败</div>';

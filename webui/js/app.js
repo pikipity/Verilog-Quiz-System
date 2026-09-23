@@ -1,6 +1,7 @@
 import { initToken, api } from './api.js';
 import { renderSettings } from './pages/settings.js';
 import { renderWeeks } from './pages/weeks.js';
+import { renderQuestion } from './pages/question.js';
 
 const routes = {
   '#/settings': renderSettings,
@@ -9,6 +10,11 @@ const routes = {
 
 async function route() {
   const app = document.getElementById('app');
+
+  if (window.__pageCleanup) {
+    window.__pageCleanup();
+    window.__pageCleanup = null;
+  }
 
   let settings = null;
   try {
@@ -29,8 +35,13 @@ async function route() {
     return;
   }
 
-  const page = routes[hash] || renderWeeks;
   try {
+    const qm = hash.match(/^#\/question\/(\d+)\/([\w-]+)$/);
+    if (qm) {
+      await renderQuestion(app, parseInt(qm[1], 10), qm[2]);
+      return;
+    }
+    const page = routes[hash] || renderWeeks;
     await page(app);
   } catch (e) {
     app.innerHTML = `<div class="card"><p class="msg err">${e.message}</p></div>`;

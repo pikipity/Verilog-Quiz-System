@@ -1,302 +1,116 @@
 """
-代码执行器 - 调用iverilog进行编译和仿真
+代码执行器 v2 - iverilog/vvp 跨平台调用
+
+- 支持设置页指定的 iverilog 路径覆盖
+- Windows 优先原生调用，失败自动 fallback 到 WSL（含路径转换）
+- GTKWave/Yosys 检测不在这里（分别在 gtkwave_helper / yosys_service）
 """
 import os
-import re
 import subprocess
 import platform
-from pathlib import Path
-from typing import Tuple, List, Dict, Optional
 from dataclasses import dataclass
+from typing import List, Tuple, Optional
 
 
 @dataclass
 class ExecutionResult:
-    """Execution result"""
     success: bool
     output: str
     error: str
-    vcd_file: Optional[str] = None
     compile_success: bool = False
     run_success: bool = False
 
 
 class CodeExecutor:
-    """
-    Code Executor
-    
-    Support cross-platform iverilog calls:
-    - Linux/Mac: Call iverilog directly
-    - Windows: Try direct call first, then try WSL
-    """
-    
-    def __init__(self):
+    def __init__(self, override_path: str = ''):
         self.system = platform.system()
         self.use_wsl = False
-        self.gtkwave_available = False
-        self.gtkwave_mode = None  # 'native', 'wsl', or None
-        self.missing_tools = []   # 记录缺失的依赖工具
-        self._detect_iverilog()
-        self._detect_gtkwave()
-    
-    def _detect_iverilog(self):
-        """Detect iverilog environment"""
-        detected = False
-        if self.system in ['Linux', 'Darwin']:
-            # Linux/Mac direct detection
-            try:
-                subprocess.run(['iverilog', '-V'], capture_output=True, check=True)
-                print("Detected iverilog (Linux/Mac)")
-                detected = True
-            except (subprocess.CalledProcessError, FileNotFoundError):
-                pass
-        else:
-            # Windows: 先尝试直接调用
-            try:
-                subprocess.run(['iverilog', '-V'], capture_output=True, check=True)
-                print("Detected iverilog (Windows)")
-                detected = True
-            except (subprocess.CalledProcessError, FileNotFoundError):
-                # 尝试WSL
-                try:
-                    subprocess.run(['wsl', 'iverilog', '-V'], capture_output=True, check=True)
-                    self.use_wsl = True
-                    print("Detected iverilog (WSL)")
-                    detected = True
-                except (subprocess.CalledProcessError, FileNotFoundError):
-                    pass
-        
-        if not detected:
-            self.missing_tools.append("iverilog")
-            print("Error: iverilog not detected, please install")
-    
-    def _detect_gtkwave(self):
-        """Detect GTKWave environment"""
-        detected = False
-        if self.system in ['Linux', 'Darwin']:
-            # Linux/Mac: check if gtkwave is in PATH
-            try:
-                subprocess.run(['gtkwave', '--version'], capture_output=True, check=True)
-                self.gtkwave_available = True
-                self.gtkwave_mode = 'native'
-                print("Detected GTKWave (Linux/Mac)")
-                detected = True
-            except (subprocess.CalledProcessError, FileNotFoundError):
-                pass
-        else:
-            # Windows: Try native first, then WSL
-            # 1. Try native GTKWave.exe
-            gtkwave_paths = [
-                r"C:\Program Files\GTKWave\bin\gtkwave.exe",
-                r"C:\Program Files (x86)\GTKWave\bin\gtkwave.exe",
-            ]
-            for path in gtkwave_paths:
-                if os.path.exists(path):
-                    self.gtkwave_available = True
-                    self.gtkwave_mode = 'native'
-                    print(f"Detected GTKWave (Windows native): {path}")
-                    detected = True
-                    break
-            
-            # 2. Try WSL GTKWave
-            if not detected:
-                try:
-                    subprocess.run(['wsl', 'which', 'gtkwave'], capture_output=True, check=True)
-                    self.gtkwave_available = True
-                    self.gtkwave_mode = 'wsl'
-                    print("Detected GTKWave (WSL)")
-                    detected = True
-                except (subprocess.CalledProcessError, FileNotFoundError):
-                    pass
-        
-        if not detected:
-            self.missing_tools.append("GTKWave")
-            print("Error: GTKWave not detected, please install")
-    
-    def _run_command(self, cmd: List[str], cwd: str = None, timeout: int = 30) -> Tuple[bool, str, str]:
-        """
-        Run command
-        
-        Args:
-            cmd: Command list
-            cwd: Working directory
-            timeout: Timeout (seconds)
-            
-        Returns:
-            (success, stdout, stderr)
-        """
+        self.iverilog: Optional[str] = None
+        self._detect(override_path)
+
+    @property
+    def available(self) -> bool:
+        return self.iverilog is not None
+
+    def _detect(self, override_path: str):
+        # 1. 用户手动指定的路径
+        if override_path and os.path.exists(override_path):
+            self.iverilog = override_path
+            return
+
+        # 2. 系统 PATH
         try:
-            if self.use_wsl:
-                # Convert file paths in command to WSL paths
-                # Note: cwd keeps Windows path because subprocess.run needs Windows path
-                cmd = [self._to_wsl_path(arg) if os.path.exists(arg) or ('/' in arg and ':' not in arg) else arg 
-                       for arg in cmd]
-                cmd = ['wsl'] + cmd
-            
-            result = subprocess.run(
-                cmd,
-                cwd=cwd,
-                capture_output=True,
-                text=True,
-                timeout=timeout,
-                encoding='utf-8',
-                errors='ignore'
-            )
-            
-            success = result.returncode == 0
-            return success, result.stdout, result.stderr
-            
-        except subprocess.TimeoutExpired:
-            return False, "", "执行超时"
-        except Exception as e:
-            return False, "", str(e)
-    
+            subprocess.run(['iverilog', '-V'], capture_output=True, check=True)
+            self.iverilog = 'iverilog'
+            return
+        except (subprocess.CalledProcessError, FileNotFoundError):
+            pass
+
+        # 3. Windows → WSL fallback
+        if self.system == 'Windows':
+            try:
+                subprocess.run(['wsl', 'iverilog', '-V'], capture_output=True, check=True)
+                self.use_wsl = True
+                self.iverilog = 'iverilog'
+            except (subprocess.CalledProcessError, FileNotFoundError):
+                pass
+
     def _to_wsl_path(self, path: str) -> str:
-        """
-        Convert Windows path to WSL path
-        
-        Example: C:/Users/name/file -> /mnt/c/Users/name/file
-        """
+        """C:/Users/x -> /mnt/c/Users/x"""
         if not path or path.startswith('/'):
             return path
-        
-        # Handle Windows absolute path
         if len(path) >= 2 and path[1] == ':':
             drive = path[0].lower()
             rest = path[2:].replace('\\', '/')
             return f"/mnt/{drive}{rest}"
-        
-        # Relative path
         return path.replace('\\', '/')
-    
-    def compile(self, verilog_files: List[str], output_file: str, work_dir: str) -> Tuple[bool, str]:
-        """
-        Compile Verilog files
-        
-        Args:
-            verilog_files: List of Verilog source files
-            output_file: Output filename
-            work_dir: Working directory
-            
-        Returns:
-            (success, error_message)
-        """
-        cmd = ['iverilog', '-o', output_file] + verilog_files
-        success, stdout, stderr = self._run_command(cmd, cwd=work_dir)
-        
-        if success:
-            return True, ""
-        else:
-            return False, stderr or stdout
-    
-    def run_simulation(self, vvp_file: str, work_dir: str) -> Tuple[bool, str, str]:
-        """
-        Run simulation
-        
-        Args:
-            vvp_file: vvp file path
-            work_dir: Working directory
-            
-        Returns:
-            (success, output_content, error_message)
-        """
-        cmd = ['vvp', vvp_file]
-        success, stdout, stderr = self._run_command(cmd, cwd=work_dir)
-        
-        return success, stdout, stderr
-    
-    def execute(self, verilog_files: List[str], work_dir: str, vvp_name: str = "out.vvp") -> ExecutionResult:
-        """
-        Complete execution flow: compile + run
-        
-        Args:
-            verilog_files: List of Verilog source files (testbench should be last)
-            work_dir: Working directory
-            vvp_name: Generated vvp filename
-            
-        Returns:
-            ExecutionResult
-        """
-        vvp_path = os.path.join(work_dir, vvp_name)
-        
-        # Step 1: Compile
-        compile_success, compile_error = self.compile(verilog_files, vvp_name, work_dir)
-        
-        if not compile_success:
-            return ExecutionResult(
-                success=False,
-                output="",
-                error=f"Compilation failed:\n{compile_error}",
-                compile_success=False,
-                run_success=False
+
+    def _run(self, cmd: List[str], cwd: str = None, timeout: int = 30) -> Tuple[bool, str, str]:
+        try:
+            if self.use_wsl:
+                # 相对路径不需要转换（wsl 会把 cwd 映射到 /mnt/...）；
+                # 只转换存在的绝对路径参数
+                cmd = [
+                    self._to_wsl_path(arg) if os.path.isabs(arg) and os.path.exists(arg) else arg
+                    for arg in cmd
+                ]
+                cmd = ['wsl'] + cmd
+
+            result = subprocess.run(
+                cmd, cwd=cwd, capture_output=True, text=True,
+                timeout=timeout, encoding='utf-8', errors='ignore'
             )
-        
-        # Step 2: Run
-        run_success, run_output, run_error = self.run_simulation(vvp_name, work_dir)
-        
-        # Find VCD file
-        vcd_file = None
-        if run_success:
-            # Extract VCD filename from output
-            vcd_match = re.search(r'\$dumpfile\("(.+?)"\)', ''.join(open(f).read() for f in verilog_files if os.path.exists(f)))
-            if vcd_match:
-                vcd_name = vcd_match.group(1)
-                vcd_path = os.path.join(work_dir, vcd_name)
-                if os.path.exists(vcd_path):
-                    vcd_file = vcd_path
-        
-        # Combine error messages
-        full_error = ""
-        if run_error:
-            full_error += run_error + "\n"
-        if not run_success and not run_error:
-            full_error = "Simulation execution failed"
-        
-        return ExecutionResult(
-            success=compile_success and run_success,
-            output=run_output,
-            error=full_error.strip(),
-            vcd_file=vcd_file,
-            compile_success=compile_success,
-            run_success=run_success
+            return result.returncode == 0, result.stdout, result.stderr
+
+        except subprocess.TimeoutExpired:
+            return False, "", "执行超时"
+        except Exception as e:
+            return False, "", str(e)
+
+    def execute(self, verilog_files: List[str], work_dir: str, vvp_name: str = "out.vvp") -> ExecutionResult:
+        """编译 + 运行。verilog_files 与 vvp_name 使用相对 work_dir 的文件名。"""
+        compile_ok, stdout, stderr = self._run(
+            ['iverilog', '-o', vvp_name] + verilog_files, cwd=work_dir
         )
-    
-    def extract_display_values(self, output: str) -> List[Dict]:
-        """
-        Extract values from $display output
-        
-        Expected format: "time=10 a=1 b=0 sel=0 out=1"
-        
-        Args:
-            output: Simulation output
-            
-        Returns:
-            List of values, each is a dict
-        """
-        values = []
-        
-        # Match key-value pair format
-        pattern = r'time=(\d+)\s+(.+)'
-        
-        for line in output.split('\n'):
-            line = line.strip()
-            match = re.match(pattern, line)
-            if match:
-                time_val = int(match.group(1))
-                rest = match.group(2)
-                
-                # Parse remaining key-value pairs
-                entry = {'time': time_val}
-                kv_pattern = r'(\w+)=([\w\'b\d]+)'
-                for kv_match in re.finditer(kv_pattern, rest):
-                    key = kv_match.group(1)
-                    val = kv_match.group(2)
-                    entry[key] = val
-                
-                values.append(entry)
-        
-        return values
+        if not compile_ok:
+            return ExecutionResult(
+                success=False, output="",
+                error=f"编译失败:\n{stderr or stdout}",
+                compile_success=False, run_success=False,
+            )
 
+        run_ok, run_out, run_err = self._run(['vvp', vvp_name], cwd=work_dir)
 
-# 单例实例
-code_executor = CodeExecutor()
+        full_error = ""
+        if run_err:
+            full_error += run_err + "\n"
+        if not run_ok and not run_err:
+            full_error = "仿真执行失败"
+
+        return ExecutionResult(
+            success=run_ok,
+            output=run_out,
+            error=full_error.strip(),
+            compile_success=True,
+            run_success=run_ok,
+        )
