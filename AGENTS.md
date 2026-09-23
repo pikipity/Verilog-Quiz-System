@@ -1,9 +1,19 @@
-<!-- From: /Users/ze/Documents/GitHub/Verilog-Quiz-System/AGENTS.md -->
-# Verilog作业考试系统 - 项目方案
+# Verilog作业考试系统 v2 - 项目方案
 
 ## 项目概述
 
-单机版Verilog作业与考试系统，学生通过GUI界面完成编程题目，程序自动加密保护标准答案，调用iverilog进行仿真测试，生成Markdown格式报告供老师人工判卷。
+单机版Verilog作业与考试系统。学生双击启动器后，程序在本机启动一个纯Python后端服务，并自动用默认浏览器打开界面。程序自动加密保护标准答案，调用iverilog进行仿真测试，调用Yosys生成RTL视图，生成Markdown格式报告供老师人工判卷。
+
+## v2 重构背景（为什么放弃 v1 架构）
+
+v1 基于 Flet/Flutter 打包桌面应用，跨平台失败的根因：**分发的是构建产物，但运行时环境不受控**——Flutter 桌面壳依赖系统 GTK3/glibc（构建还需 clang/cmake/锁版 Flutter SDK），iverilog/GTKWave 由学生自行安装且安装状态各异。失败面是各层环境变量的乘积，无法靠测试覆盖。
+
+v2 的核心原则：**把环境差异降到理论下限**
+
+1. 分发的包只含 Python 运行时 + 静态文件，不链接任何系统 GUI 库；渲染交给浏览器（各平台最可靠的运行时）；
+2. 后端零第三方 Python 依赖（仅用标准库），前端零构建步骤（原生 ES Modules + vendored 库）；
+3. 外部工具（iverilog/GTKWave/Yosys）锁定版本、学生自装，程序负责三级探测、版本验证与功能自检；
+4. 不再使用虚拟机，原生支持 Windows / macOS / Linux。
 
 ---
 
@@ -11,33 +21,45 @@
 
 | 组件 | 技术选择 | 说明 |
 |------|---------|------|
-| **GUI框架** | Flet (Python) | 原生桌面窗口，Material Design风格，支持Markdown渲染 |
-| **网络更新** | HTTP静态文件 | 服务器存放明文题目，程序下载时自动加密 |
-| **加密方案** | 内置固定密钥 + SHA256派生 + XOR + Base64 | 防无意查看，明文仅存在于内存 |
-| **仿真执行** | iverilog + vvp | 学生自行安装，程序跨平台调用 |
-| **波形查看** | GTKWave | 跨平台波形分析工具（必须安装） |
-| **报告生成** | Markdown | 纯文本格式，便于老师人工判卷 |
+| **GUI** | 学生默认浏览器 | 无构建原生 ES Modules SPA，第三方库全部 vendored 进包 |
+| **后端** | Python 标准库 HTTP 服务 | ThreadingHTTPServer，只绑 127.0.0.1:随机端口，随机 token 鉴权 |
+| **打包** | PyInstaller onedir | 四平台 CI 构建，零第三方 Python 依赖（不用 requests/cryptography/flet） |
+| **题目分发** | HTTP 静态文件 | 服务器结构不变，manifest 增加 schema_version |
+| **加密** | 内置密钥 + SHA256 派生 + XOR + Base64 | 不变，仅加密 reference.v（hashlib 标准库实现） |
+| **仿真执行** | iverilog + vvp | 锁定版本，学生自行安装 |
+| **波形查看** | GTKWave | 锁定版本，学生自行安装 |
+| **RTL 视图** | Yosys write_json + netlistsvg | Yosys 锁版本学生自装；netlistsvg vendored，浏览器内渲染 SVG；仅对学生代码 |
+| **报告** | Markdown 本地生成 | 学生手动提交；内含数值对比表（仅供老师判卷） |
 
 ---
 
-## 服务器端结构
+## 服务器端结构（不变）
 
 ```
 https://your-server.com/verilog-quiz/
-├── manifest.json                    # 全局清单
+├── manifest.json                    # 全局清单（v2 增加 schema_version 字段）
 ├── week1/
-│   ├── info.json                    # 周次配置（新ID格式）
-│   ├── q1/                          # 题库folder（实际内容）
-│   │   ├── question.md              # 题目描述（含文字、图片）
-│   │   ├── testbench.v              # 测试平台（老师编写）
-│   │   └── reference.v              # 标准答案
-│   ├── q2/
+│   ├── info.json                    # 周次配置（id/folder 分离格式）
+│   ├── q1/
+│   │   ├── question.md              # 题目描述（含图片）
+│   │   ├── testbench.v              # 测试平台
+│   │   └── reference.v              # 标准答案（服务器端明文，见"URL混淆"节）
 │   └── ...
-├── week2/
 └── ...
 ```
 
-### info.json 格式（新ID格式）
+### manifest.json（v2）
+
+```json
+{
+  "schema_version": 2,
+  "weeks": ["week1", "week2", "week3"]
+}
+```
+
+`schema_version` 是对账同步的合法性闸门：字段缺失或值不支持时，客户端中止同步且**不删除任何本地数据**。老师下次发布题目时加入该字段。
+
+### info.json 格式（不变）
 
 ```json
 {
@@ -45,15 +67,13 @@ https://your-server.com/verilog-quiz/
   "title": "组合逻辑电路基础",
   "updated_at": "2026-04-01T10:00:00",
   "questions": [
-    {"id": "mux2to1_v1", "folder": "q1", "title": "2选1数据选择器"},
-    {"id": "and2_v1", "folder": "q2", "title": "2输入与门"},
-    {"id": "halfadder_v1", "folder": "q3", "title": "半加器"}
+    {"id": "mux2to1_v1", "folder": "q1", "title": "2选1数据选择器"}
   ],
   "select_count": 2
 }
 ```
 
-**关键设计**：`id` 与 `folder` 分离。服务器端按 `folder` 组织文件，客户端下载后以 `id` 作为本地目录名。当题目更新时，可更换 `id` 而保持 `folder` 不变，确保学生能获取到更新后的题目。
+**关键设计**（不变）：`id` 与 `folder` 分离。服务器端按 `folder` 组织文件，客户端下载后以 `id` 作为本地目录名。题目更新时可更换 `id` 而保持 `folder` 不变。
 
 ---
 
@@ -61,508 +81,297 @@ https://your-server.com/verilog-quiz/
 
 ```
 Verilog-Quiz-System/
-├── main.py                          # 程序入口
-├── config.py                        # 配置（内置密钥、服务器地址）
-├── core/                            # 核心逻辑层
-│   ├── __init__.py
-│   ├── crypto_manager.py            # 加密/解密管理
-│   ├── question_manager.py          # 题目下载、抽题、缓存
-│   ├── code_executor.py             # iverilog跨平台调用
-│   ├── result_analyzer.py           # 数值结果提取与对比
-│   ├── report_generator.py          # Markdown报告生成
-│   └── storage.py                   # 本地进度管理（未实现，功能分散在UI层）
-├── ui/                              # 界面层
-│   ├── __init__.py
-│   ├── app.py                       # Flet主应用
-│   ├── week_selector.py             # 周次选择（进度显示、检查更新）
-│   └── question_view.py             # 答题界面（垂直布局）
-├── questions/                       # 本地题目缓存
-│   └── week1/
-│       ├── info.json                # 周次配置
-│       ├── draw_result.json         # 抽题结果记录
-│       ├── mux2to1_v1/              # 抽中的题（以id为目录名）
-│       │   ├── question.md
-│       │   ├── testbench.v
-│       │   └── reference.v.enc      # 加密存储
-│       └── and2_v1/
-│           └── ...
-├── submissions/                     # 学生代码保存
-│   └── week1/
-│       ├── progress.json            # 周级别进度汇总
-│       ├── mux2to1_v1/
-│       │   ├── mux2to1_v1.v         # 学生代码
-│       │   ├── progress.json        # 题目级别进度
-│       │   ├── result.json          # 测试结果
-│       │   └── temp/                # 临时仿真文件
-│       └── and2_v1/
-│           └── ...
-└── reports/
-    └── week1_report.md              # 最终报告
+├── main.py                          # 启动器：起本地服务、生成token、打开浏览器
+├── config.py                        # 数据目录、锁定工具版本号、混淆后的服务器URL
+├── backend/                         # HTTP层（纯标准库，无第三方依赖）
+│   ├── app.py                       # 路由分发、token校验、静态文件托管
+│   └── services/
+│       ├── sync_service.py          # 题目对账同步（含week消失删除）
+│       ├── yosys_service.py         # Yosys调用、RTL JSON生成
+│       └── diagnostics.py           # 工具三级探测、版本验证、功能自检
+├── core/                            # v1保留的核心资产
+│   ├── crypto_manager.py            # 加密/解密（不变）
+│   ├── question_manager.py          # 下载、加密存储（保留）；同步对账与学号抽题（重写）
+│   ├── code_executor.py             # iverilog/vvp跨平台调用（平移，加yosys）
+│   ├── result_analyzer.py           # $display数值对比（供报告生成使用）
+│   └── report_generator.py          # 报告生成（加学号头部+数值对比表）
+├── webui/                           # 前端静态文件（无构建步骤）
+│   ├── index.html
+│   ├── js/                          # 五个页面模块 + API封装 + hash路由
+│   └── vendor/                      # codemirror6, marked, dompurify, netlistsvg, svg-pan-zoom
+├── questions/  submissions/  reports/   # 数据目录（打包后位于平台数据目录，见config.py）
+└── .github/workflows/               # PyInstaller四平台构建 + 无头冒烟测试
 ```
+
+**已删除**：`ui/`（Flet界面层）、flet/flet-desktop 依赖、旧 Flutter 构建 workflow。
+
+---
+
+## API 设计（本地后端）
+
+所有接口只监听 127.0.0.1，请求头需携带本次启动的随机 token。
+
+| 端点 | 说明 |
+|------|------|
+| `GET /api/health` | 就绪探测（CI冒烟与前端轮询用） |
+| `GET/PUT /api/settings` | 学号、姓名、工具路径覆盖 |
+| `GET /api/tools/status` | 四工具三级验证结果（存在性/版本/自检） |
+| `POST /api/tools/selfcheck` | 用内置最小样例做功能自检 |
+| `POST /api/sync` | 检查更新+对账，返回变更摘要（新增/更新/移除） |
+| `GET /api/weeks` | 周次列表+进度 |
+| `GET /api/weeks/{n}/questions` | 抽中题目列表（含完成状态） |
+| `GET /api/questions/{week}/{qid}` | 题面（图片base64内嵌）+ testbench |
+| `GET/PUT /api/questions/{week}/{qid}/code` | 学生代码读取/保存 |
+| `POST /api/questions/{week}/{qid}/test` | 编译+仿真学生与参考代码，写result.json |
+| `GET /api/questions/{week}/{qid}/result` | 测试结果 |
+| `POST /api/questions/{week}/{qid}/gtkwave?which=student\|ref` | 拉起GTKWave |
+| `POST /api/questions/{week}/{qid}/rtl` | Yosys生成RTL JSON（或错误输出） |
+| `POST /api/reports/{week}/generate` / `GET /api/reports/{week}` / `POST /api/reports/{week}/open_folder` | 报告生成/预览/打开位置 |
 
 ---
 
 ## 核心流程
 
-### 1. 题目更新与抽题流程
+### 1. 首次启动流程
 
 ```
-启动程序 → 检查manifest → 发现Week 1有更新
+检测settings.json不存在 → 前端跳转设置页
   ↓
-下载info.json → 获取questions列表和select_count
+学生输入学号（必填）+ 姓名 → 保存settings.json
   ↓
-检查本地draw_result.json是否存在
-  ├─ 存在 → 读取已抽题目（基于id列表）
-  └─ 不存在 → 基于机器指纹生成固定随机种子 → 从id列表中抽select_count道并打乱
+工具检测（诊断页可查看三级验证结果，缺失给安装指引）
   ↓
-下载抽中的题目（按folder路径下载，本地以id为目录名存储）
-  ↓
-reference.v → 内存中加密 → 保存为reference.v.enc → 删除内存明文
-  ↓
-保存draw_result.json → 显示周次列表
+触发题目同步 → 进入周次列表
 ```
 
-### 2. 答题流程
+### 2. 题目同步对账流程（v2 重写）
 
 ```
-选择Week 1 → 自动跳转到第一道未完成的题
-  ↓
-加载question.md显示题目（图片自动转base64内嵌）
-  ↓
-检查submissions/week1/{qid}/{qid}.v是否存在 → 加载此前代码到编辑器
-  ↓
-学生编写代码 → 失焦时自动保存
-  ↓
-点击"运行测试"
-  ↓
-检测iverilog环境（跨平台策略见下方章节）
-  ↓
-临时解密reference.v → 内存中获取标准答案
-  ↓
-分别编译运行学生代码和参考答案 → 生成各自VCD文件
-  ↓
-显示编译/运行状态 → 提供GTKWave按钮查看波形
-  ↓
-保存结果到submissions/week1/{qid}/result.json
-  ↓
-清除内存中的参考答案
-  ↓
-点击"保存并继续" → 标记完成，加载下一题
+拉取 manifest.json
+  ├─ 失败/超时/schema非法 → 中止同步，不删任何本地数据，提示离线可用
+  └─ 成功且校验通过
+       ↓
+对账：
+  ├─ 本地有而服务器无的week → 删除 questions/weekN + submissions/weekN + reports/weekN_report.md
+  ├─ 两边都有但 updated_at 更新 → 重下info.json，按学号种子对新id列表重算抽题；
+  │    被移除题目连同其 submissions 删除；仍存在题目的学生代码保留
+  └─ 服务器新增week → 抽题、下载、加密存储（同v1）
+       ↓
+返回摘要 → UI展示："新增 Week 3 / 更新 Week 1 / 移除 Week 2"
 ```
 
-### 3. 重做机制
+### 3. 学号抽题（v2 替换机器指纹）
+
+- 种子：`SHA256(f"{student_id}_week{N}")`，完全确定——换电脑、重装系统结果不变；
+- 首次启动在设置页录入学号，存 `settings.json`；
+- **修改学号**：弹确认框，确认后清空 questions/submissions/reports 全部本地数据并重新同步（防共享电脑串数据）；
+- 报告头部自动写入学号与姓名。
+
+### 4. 答题流程
 
 ```
-已完成Week 1 → 列表显示"Completed"
+选择题目 → 加载题面（图片base64内嵌）+ 已存学生代码
   ↓
-点击进入 → 显示题目选择块（带完成状态）
+编辑代码（CodeMirror，Verilog语法高亮）→ 失焦+定时(30s)自动保存
   ↓
-选择其他题目或当前题 → 加载已有代码
+点击"运行测试" → 后端临时解密reference.v → 分别编译运行学生/参考代码
   ↓
-修改代码 → 自动保存（覆盖）
+生成各自VCD → 保存result.json → 清除内存与临时明文
   ↓
-重新运行测试 → 更新result.json
+结果面板：编译/运行状态 + [查看期望波形] [查看你的波形] + RTL标签页
 ```
 
-### 4. 报告生成流程
+### 5. RTL 视图（v2 新功能）
+
+- 后端执行：`yosys -p "read_verilog student.v; hierarchy -auto-top; proc; opt; write_json rtl.json"`；
+- 前端用 netlistsvg 渲染为 SVG，svg-pan-zoom 支持缩放拖拽；
+- **仅对学生代码生成；不提供参考代码的RTL视图**（门级结构图等同泄题）；
+- 学生代码含 `#delay`、`initial` 等行为级语法时 Yosys 报错 → 前端展示原始错误输出，并提示"RTL视图仅适用于可综合代码，仿真波形不受影响"；
+- 不使用 `yosys show`（依赖Graphviz，避免引入第四个外部工具）。
+
+### 6. 重做机制（不变）
+
+已完成题目可随时重新进入，加载已有代码，修改后自动覆盖保存，重新测试更新 result.json；重新生成报告即覆盖本地文件。
+
+### 7. 报告生成流程
 
 ```
-完成所有题目（或点击"生成报告"）
+点击"生成报告" → 读取draw_result.json确定题目顺序
   ↓
-读取draw_result.json确定题目顺序和id
+逐题整合：题面（过滤图片语法）+ 学生代码 + 测试结果
   ↓
-遍历每道题（按id查找）
-  ├─ 读取question.md（过滤图片语法）
-  ├─ 读取submissions/weekN/{qid}/{qid}.v（学生代码）
-  └─ 读取submissions/weekN/{qid}/result.json（测试结果）
+数值对比表：调用result_analyzer对比学生与参考的$display输出，
+  ↓        逐时刻列表写入报告（仅供老师判卷，前端不展示）
+生成 reports/weekN_report.md（头部含学号+姓名）
   ↓
-整合生成week1_report.md
-  ↓
-显示预览 + "打开文件位置"按钮
-  ↓
-学生手动从学校作业系统提交报告文件
+预览 + "打开文件位置" → 学生手动到学校系统提交
 ```
 
 ---
 
 ## 关键设计细节
 
-### 加密策略
+### 本地服务安全
 
-- **算法**：SHA256(MASTER_KEY)派生32字节密钥 → XOR循环加密 → Base64编码存储
-- **密钥**：程序内置固定32字节密钥（硬编码）
-- **范围**：仅加密reference.v，question.md和testbench.v明文存储
-- **时机**：下载时立即加密，使用时内存解密，明文不落盘
+- 只绑定 `127.0.0.1`，端口由系统分配（`port=0`）；
+- 每次启动生成随机 token，前端所有请求在 header 中携带，后端校验；
+- 校验 Host 头，防 DNS rebinding；
+- Windows 打包为 windowed 模式（无控制台窗口），日志写文件且脱敏。
 
-### 抽题随机策略
+### 代码持久化（重启不丢）
 
-- **种子**：基于机器硬件信息（MAC地址/CPU/平台）+ 周次编号生成固定种子
-- **特性**：同一台电脑同一周次，每次打开抽题结果相同
-- **记录**：draw_result.json保存抽题结果，防止重复抽题
-- **格式**：draw_result.json含完整题目信息（id, folder, title, original_index）
+- 学生代码只存磁盘、不存浏览器：失焦 + 定时（30s）+ 运行测试前三重自动保存，经 API 写入 `submissions/weekN/{qid}/{qid}.v`；
+- 数据目录（打包后）：Windows `%LOCALAPPDATA%\Verilog-Quiz`；macOS `~/Library/Application Support/Verilog-Quiz`；Linux `~/.local/share/verilog-quiz`；
+- 重启电脑、换浏览器、清浏览器缓存均不丢代码；进度由磁盘 progress.json 恢复；
+- 仅有的删除场景：week 从服务器消失（同步时删）、修改学号（确认后清空）——均有明示。
 
-### 自动保存策略
+### 服务器URL客户端混淆
 
-- **触发**：编辑器失焦时自动保存、运行测试前
-- **位置**：submissions/weekN/{qid}/{qid}.v
-- **进度**：同时更新题目级别progress.json和周级别progress.json
-- **重做**：直接覆盖原文件，不保留历史版本
+- URL 不以明文硬编码：拆段 + 编码存储，运行时拼装（二进制中 strings 搜不到明文）；
+- 任何日志、API 返回值、界面均不出现 URL（v1 主界面底部曾直接展示，已移除）；
+- 定位：防无意查看，不防专业破解（与加密策略同级）。
 
-### 数值提取策略
+### 工具链管理：三级探测 + 三级验证
 
-- **已实现**：result_analyzer.py可解析`$display`输出（格式`time=10 a=1 b=0 y=1`），生成时间-数值对比表
-- **当前UI状态**：测试流程中已保存ExecutionResult，但**未调用result_analyzer进行数值对比展示**
-- **备选**：VCD文件解析功能已预留但尚未集成到主流程
+**三级探测**（定位可执行文件）：
+1. 系统 PATH；
+2. 常见安装目录（如 `C:\Program Files\GTKWave\bin\`）；
+3. 设置页中用户手动指定的路径（解决"装到非标准位置检测不到"）。
 
-### 报告内容格式
+**三级验证**（诊断页逐工具展示红绿灯）：
+1. 存在性：三级探测是否找到；
+2. 版本：运行 `-V`/`--version` 解析版本号，与锁定版本比对（绿=匹配，黄=不匹配但可用，红=未找到）；
+3. 功能自检：点击"运行自检"，后端用**内置最小Verilog样例**（不依赖已下载题目）真实跑通 iverilog 编译 + vvp 仿真 + yosys JSON 生成；GTKWave 无法无头验证，提供"测试打开"按钮目视确认。
 
-```markdown
-# Verilog Assignment Report - Week 1: 组合逻辑基础
+诊断页支持一键复制完整诊断信息（OS、程序版本、各工具版本与路径、自检结果），便于学生求助。
 
-**Generated**: 2026-04-05 14:30:25
-**Questions**: 3
+**锁定版本**（写入学生安装手册）：iverilog v12.x、GTKWave 3.3.x、Yosys 0.4x（发布前实测确定具体小版本）。版本不符警告但不阻断。
 
----
+### 加密策略（不变）
 
-## Question 1 (ID: mux2to1_v1)
-**Title**: 2选1数据选择器
+- 算法：SHA256(MASTER_KEY) 派生 32 字节密钥 → XOR 循环加密 → Base64 存储；
+- 仅用 hashlib/base64 标准库实现（v1 的 cryptography 依赖未实际使用，已移除）；
+- 仅加密 reference.v，下载时立即加密，使用时内存解密，明文不落盘。
 
-### Question Description
-实现一个2选1数据选择器...
+### Windows 双模式（保留）
 
-### Student Code
-```verilog
-module mux2to1(
-    input a, b, sel,
-    output y
-);
-    assign y = sel ? b : a;
-endmodule
-```
+Windows 优先调用原生 iverilog/GTKWave，失败时 fallback 到 WSL（保留 v1 的路径转换逻辑）；安装手册只推原生安装。
 
-### Test Results
-**Status**: ✅ Test Completed / ❌ Compilation Failed
-**Simulation Output**: ...
-```
+### GTKWave 集成（不变）
+
+平移 `gtkwave_helper.py`：解析 VCD 信号、自动生成 Tcl 脚本添加全部信号并缩放到合适视图；参考/学生波形分别对应 `ref_wave.vcd` / `student_wave.vcd`。
 
 ---
 
 ## 界面设计
 
-### 主界面 - 周次选择
+五个页面（单页应用，hash 路由）：
 
-垂直布局，顶部标题，中间周次卡片列表，底部操作栏。
-
-```
-┌─────────────────────────────────────────────┐
-│  Verilog Quiz System                        │
-│  Select week to start assignment            │
-├─────────────────────────────────────────────┤
-│  ┌───────────────────────────────────────┐  │
-│  │ Week 1: 组合逻辑基础                    │  │
-│  │ ● In Progress 1/2  [Continue]          │  │
-│  └───────────────────────────────────────┘  │
-│  ┌───────────────────────────────────────┐  │
-│  │ Week 2: 时序逻辑入门                    │  │
-│  │ ○ Not Started 0/2  [Start]             │  │
-│  └───────────────────────────────────────┘  │
-├─────────────────────────────────────────────┤
-│  [Check Update]    [Open Data Directory]    │
-│  Server: http://...                         │
-└─────────────────────────────────────────────┘
-```
-
-### 答题界面
-
-**垂直单列布局**（整个页面可滚动）：
-
-```
-┌───────────────────────────────────────────────────────────┐
-│ [←]  Week 1 - Question 1/2                    ID: mux2...  │
-│       2选1数据选择器                                       │
-├───────────────────────────────────────────────────────────┤
-│  Question Selection [1. 2选1选择器 ●] [2. 2输入与门 ○]    │
-├───────────────────────────────────────────────────────────┤
-│  Question Description                                      │
-│  ───────────────────────────────                          │
-│  ## 2选1数据选择器                                          │
-│  实现根据sel选择a或b输出...                                 │
-│  [Markdown渲染，含base64图片]                               │
-├───────────────────────────────────────────────────────────┤
-│  Code Editor                                               │
-│  ───────────────────────────────                          │
-│  1│  module mux2to1(                                       │
-│  2│      input a, b, sel,                                  │
-│  3│      output y                                          │
-│  4│  );                                                    │
-│  5│      // Write your code here                           │
-│  6│  endmodule                                             │
-├───────────────────────────────────────────────────────────┤
-│  Testbench (read-only)                                     │
-│  ───────────────────────────────                          │
-│  1│  `timescale 1ns/1ps                                   │
-│  2│  module tb_mux2to1;                                   │
-│  ...                                                       │
-├───────────────────────────────────────────────────────────┤
-│  Saved 14:30:25    [Previous] [Run Test] [Save & Continue] │
-└───────────────────────────────────────────────────────────┘
-```
-
-### 测试结果对话框
-
-```
-┌─────────────────────────────────────────────────┐
-│  Test Results                          [Close]  │
-├─────────────────────────────────────────────────┤
-│  [✓]  Simulation Successful                      │
-│  Your code compiled and ran successfully.       │
-│                                                 │
-│  [View Expected Waveform]  [View Your Waveform] │
-└─────────────────────────────────────────────────┘
-```
+1. **设置页**：学号（必填）、姓名、三个工具的手动路径覆盖（可选）、服务器连接测试；
+2. **周次列表页**：周次卡片（进度状态）、[检查更新]按钮、同步摘要弹窗（新增/更新/移除）、[打开数据目录]；
+3. **答题页**：题面（Markdown渲染含图片）、CodeMirror 编辑器（Verilog高亮+行号）、testbench 只读区、测试按钮与结果面板（状态 + 波形两按钮 + RTL标签页）、[上一题][保存并继续]；
+4. **报告页**：报告预览、[生成报告]、[打开文件位置]；
+5. **诊断页**：四工具三级验证表格（状态灯/检测版本vs锁定版本/路径）、[运行自检]、[测试打开GTKWave]、[一键复制诊断信息]。
 
 ---
 
-## 跨平台iverilog调用策略
+## 分发形态
 
-### 平台检测与调用优先级
-
-| 平台 | 调用策略 | 说明 |
-|------|---------|------|
-| **Linux** | 直接调用 `iverilog` | 系统PATH中需存在 |
-| **macOS** | 直接调用 `iverilog` | 系统PATH中需存在 |
-| **Windows** | 1. 尝试直接调用 `iverilog`<br>2. 失败则尝试 `wsl iverilog` | 优先原生，次选WSL |
-
-### 路径处理（Windows + WSL）
-
-Windows路径与WSL路径自动转换：
-- `C:\Users\name\project` → `/mnt/c/Users/name/project`
-- 程序内部自动处理，学生无需手动干预
-
-### 调用流程
-
-```python
-def execute_iverilog(command_args, cwd):
-    system = platform.system()
-    
-    if system in ['Linux', 'Darwin']:
-        return subprocess.run(['iverilog'] + command_args, cwd=cwd, ...)
-    
-    elif system == 'Windows':
-        try:
-            return subprocess.run(['iverilog'] + command_args, cwd=cwd, ...)
-        except FileNotFoundError:
-            # WSL fallback
-            wsl_args = [convert_to_wsl_path(arg) for arg in command_args]
-            return subprocess.run(['wsl'] + wsl_args, ...)
-```
+- 学生侧程序**免安装**：下载 zip → 解压 → 双击运行；Windows 无控制台窗口；
+- Windows 未签名可能有 SmartScreen 提示（"更多信息→仍要运行"）；macOS 需右键打开一次（或 `xattr -dr com.apple.quarantine`）；均写入手册；
+- 学生唯一需要安装的是三个外部工具（iverilog/GTKWave/Yosys 锁定版本）。
 
 ---
 
-## GTKWave 波形查看策略
+## 打包与 CI
 
-GTKWave是本系统的必须外部依赖，用于查看仿真生成的VCD波形文件。
-
-### 跨平台检测与调用
-
-| 平台 | 检测策略 | 调用方式 |
-|------|---------|------|
-| **Windows** | 1. `C:\Program Files\GTKWave\bin\gtkwave.exe`<br>2. `wsl which gtkwave` | 原生exe 或 `wsl gtkwave` |
-| **macOS** | `gtkwave --version` / `open -a GTKWave` | `open -a GTKWave` 或 `gtkwave` |
-| **Linux** | `gtkwave --version` | 直接调用 `gtkwave` |
-
-### Tcl脚本自动生成
-
-程序会自动解析VCD文件中的所有信号名，生成Tcl脚本用于GTKWave自动添加所有信号并缩放到合适视图：
-```tcl
-gtkwave::addSignalsFromList "tb.dut.a"
-gtkwave::addSignalsFromList "tb.dut.b"
-gtkwave::/Time/Zoom/Zoom_Full
-```
-
-### 测试流程中的VCD
-
-运行测试时，程序会自动修改testbench中的`$dumpfile`名称：
-- 参考代码测试 → `ref_wave.vcd`
-- 学生代码测试 → `student_wave.vcd`
-
-学生可在测试结果对话框中分别打开"期望波形"和"你的波形"进行对比。
+- **PyInstaller onedir**（比 onefile 启动快、杀软误报少），zip 分发；
+- **CI matrix**：`windows-latest`（x64）、`macos-14`（arm64）、`ubuntu-22.04`（x64）、`ubuntu-24.04-arm`；
+- **无头端到端冒烟**（Web架构的红利）：每个平台产物启动后 `curl /api/health` 验证服务可用；Linux runner 上安装 iverilog+yosys，通过 API 无头跑完"同步→写码→仿真→RTL→报告"全流程；
+- **分支分工**：
+  - `push 到 dev`：四平台构建 + 冒烟 + 上传 artifacts，**不创建 Release**（仅验证打包流程，产物可从 Actions 页下载试跑）；
+  - `push 到 main`（含 PR 合并）：四平台构建 + 冒烟 + 自动创建 GitHub Release 分发 zip；
+  - 两分支均保留 workflow_dispatch 手动触发。
 
 ---
 
-## 开发阶段
+## 开发阶段（v2 里程碑）
 
-### 第一阶段：基础框架 ✅
+| 里程碑 | 内容 | 验证目标 |
+|--------|------|---------|
+| **M1** | 删除 ui/ 与 Flet 依赖；后端骨架 + main.py 启动器 + PyInstaller + CI 冒烟 | 最先验证核心假设：四平台产物都能起服务、开页面 |
+| **M2** | 对账同步 + 学号抽题 + 设置页 | week 消失/更新/新增场景全覆盖 |
+| **M3** | 答题主流程（编辑器/仿真/波形/GTKWave） | 功能与 v1 持平 |
+| **M4** | Yosys RTL 视图 | 新功能落地 |
+| **M5** | 报告（含对比表）+ 诊断页 + 安装手册 + 端到端 CI | 可发布 |
 
-- [x] Flet主程序搭建与页面路由
-- [x] 周次选择界面（进度状态）
-- [x] 代码编辑器组件（TextField + 等宽字体 + 行号显示）
-
-### 第二阶段：题目系统 ✅
-
-- [x] HTTP下载功能（manifest解析、文件下载）
-- [x] 加密管理器（内置密钥、下载时加密）
-- [x] 抽题算法（机器指纹种子、draw_result持久化）
-- [x] 题目管理器（新ID格式、抽题、缓存、读取）
-- [x] Markdown图片base64内嵌
-
-### 第三阶段：仿真执行 ✅
-
-- [x] iverilog跨平台检测与调用
-- [x] iverilog调用封装（编译+运行）
-- [x] 结果解析器（$display提取）
-- [x] 分别运行学生代码和参考代码
-- [x] 生成独立VCD文件
-
-### 第四阶段：保存与重做 ✅
-
-- [x] 失焦自动保存
-- [x] 进度管理（题目级别 + 周级别progress.json）
-- [x] 重做机制（题目选择块快速跳转）
-
-### 第五阶段：报告系统 ✅
-
-- [x] 单题结果存储（JSON格式）
-- [x] Markdown报告生成器（整合多题、过滤图片）
-- [x] "打开文件位置"功能
-
-### 第六阶段：波形查看 ✅
-
-- [x] GTKWave跨平台集成
-- [x] Tcl脚本自动生成
-- [x] 期望波形 vs 学生波形对比查看
-
-### 待优化
-
-- [ ] 数值对比表格在UI中展示（result_analyzer已实现，但未在question_view中调用）
-- [ ] 定时自动保存（当前仅失焦保存）
-- [ ] 代码语法高亮
+**确认门**：M5 完成后先由项目维护者本机测试（按验收清单逐项确认），通过后再进行 workflow 打包改造，最终 PR 合入 main 触发发布构建。
 
 ---
 
 ## 部署清单
 
-### 服务器端
+### 服务器端（不变）
 
-- [ ] Web服务器（Nginx/Apache/其他）
-- [ ] 创建 `/verilog-quiz/` 目录
-- [ ] 按周次组织题目文件夹（使用folder名如q1, q2）
-- [ ] 每道题包含：question.md、testbench.v、reference.v
-- [ ] 提供 manifest.json 和 info.json（新ID格式）
-- [ ] 配置CORS支持（客户端跨域访问）
+- 静态文件服务，按周次组织题目文件夹（folder 名如 q1, q2）；
+- 每道题：question.md、testbench.v、reference.v；
+- manifest.json 增加 `schema_version: 2`，info.json 格式不变。
 
 ### 客户端
 
-- [ ] Python 3.11+ 环境（开发用）
-- [ ] iverilog 自行安装（学生根据系统选择安装方式）
-- [ ] GTKWave 自行安装（必须，用于波形查看）
-- [ ] PyInstaller 打包配置（仅打包程序，不含iverilog/GTKWave）
+- 学生下载对应平台 zip，解压即用（无需 Python、无需虚拟机）；
+- 自行安装锁定版本的 iverilog、GTKWave、Yosys（安装手册提供各平台图文指引）。
 
 ---
 
 ## 使用流程
 
-### 老师视角
+### 老师视角（不变）
 
-1. **准备题目**：编写 question.md、testbench.v、reference.v
-2. **分配ID**：为每道题分配独立id（如`mux2to1_v1`），放入folder（如`q1`）
-3. **配置info.json**：填写questions列表、select_count、updated_at时间戳
-4. **上传服务器**：按周次文件夹上传到Web服务器
-5. **完成**：无需加密操作，无需编写服务器程序
+准备题目三件套 → 分配 id 放入 folder → 配置 info.json → 上传服务器 → 无需加密操作、无需服务器程序。
 
-### 学生视角
+### 学生视角（v2）
 
-1. **安装iverilog**：根据系统安装iverilog
-2. **安装GTKWave**：根据系统安装GTKWave（必须）
-3. **运行程序**：双击 exe 打开
-4. **检查更新**：自动或手动检查新题目
-5. **选择周次**：查看进度状态，选择当前作业
-6. **答题**：逐题编写代码，失焦自动保存，运行测试查看编译/运行状态
-7. **查看波形**：点击GTKWave按钮查看期望波形和自己的波形
-8. **重做**：可随时返回修改已完成的题目
-9. **生成报告**：完成后生成Markdown文件
-10. **提交**：手动将报告文件上传到学校作业系统
+1. 按手册安装锁定版本的 iverilog / GTKWave / Yosys；
+2. 下载解压程序，双击运行，浏览器自动打开界面；
+3. 首次启动输入学号姓名；诊断页确认四个工具全绿；
+4. 检查更新下载题目，选择周次开始答题；
+5. 编写代码（语法高亮），自动保存，运行测试查看状态；
+6. 查看期望/自己的波形，查看自己代码的 RTL 视图；
+7. 可随时重做已完成题目；完成后生成报告；
+8. 手动将报告文件上传到学校作业系统。
 
 ---
 
-## 本地测试指南
-
-### 测试环境准备
-
-1. **安装iverilog**
-   - Windows: http://bleyer.co.uk/icarus/ 或 WSL (`sudo apt-get install iverilog`)
-   - Linux: `sudo apt-get install iverilog`
-   - macOS: `brew install icarus-verilog`
-
-2. **安装GTKWave**
-   - Windows: https://gtkwave.sourceforge.net/
-   - Linux: `sudo apt-get install gtkwave`
-   - macOS: `brew install gtkwave`
-
-3. **确保uv已安装**（项目使用uv管理Python环境）
-
-### 测试步骤
-
-需要同时运行两个程序：HTTP服务器（提供题目）和主程序（GUI界面）。
-
-#### 步骤1：启动测试服务器
+## 本地开发指南
 
 ```bash
-cd <项目目录>
+# 启动测试题目服务器（保持不变）
 uv run python setup_test_server.py
-```
 
-看到以下输出表示服务器启动成功：
-```
-🚀 服务器启动: http://localhost:8080
-📁 题目地址: http://localhost:8080/verilog-quiz
-```
-
-**保持此终端运行，不要关闭！**
-
-#### 步骤2：运行主程序（GUI界面）
-
-```bash
-cd <项目目录>
+# 开发模式运行主程序（同样起本地服务+自动开浏览器，无需打包）
 uv run python main.py
 ```
 
-#### 步骤3：功能测试流程
-
-1. **检查更新**：点击"Check Update"按钮
-2. **下载题目**：程序自动抽题并下载
-3. **开始答题**：选择周次，程序自动跳转到第一题
-4. **运行测试**：编写代码后点击"Run Test"
-5. **查看波形**：点击"View Your Waveform"打开GTKWave
-6. **保存继续**：完成所有题目后生成报告
+- 前端开发：直接改 `webui/` 下文件，刷新浏览器即可，无构建步骤；
+- 后端开发：改 `backend/`、`core/` 后重启 main.py；
+- 重新测试下载流程：删除 `questions/` 内容（保留 .gitkeep）后重新同步。
 
 ### 常见问题
 
-**Q: 提示"无法连接到服务器"**
-- A: 检查测试服务器是否还在运行
-- A: 检查 `config.py` 中的 `SERVER_URL` 是否为 `http://localhost:8080/verilog-quiz`
-
-**Q: 提示"未检测到iverilog"**
-- A: 确保iverilog已安装并添加到系统PATH
-- A: Windows用户可以尝试在WSL中安装iverilog
-
-**Q: 提示"GTKWave not found"**
-- A: 确保GTKWave已安装（必须组件）
-- A: Windows用户：确保安装在 `C:\Program Files\GTKWave\bin\gtkwave.exe`
-
-**Q: 如何重新测试下载流程？**
-- A: 删除 `questions/` 目录下的内容（保留.gitkeep），重新点击"Check Update"
+- **提示无法连接服务器**：确认测试服务器运行中；开发模式下 config.py 中的地址为明文（打包后混淆）；
+- **诊断页工具红灯**：按手册安装锁定版本，或在设置页手动指定安装路径；
+- **RTL 视图报错**：确认代码为可综合子集（无 `#delay`/`initial` 等行为级语法）。
 
 ---
 
 ## 技术约束与注意事项
 
-1. **iverilog依赖**：学生需自行安装iverilog，程序自动检测环境并提示
-2. **GTKWave依赖**：学生需自行安装GTKWave，程序自动检测并支持跨平台调用
-3. **Windows双模式**：Windows优先尝试原生iverilog/GTKWave，失败自动 fallback 到WSL
-4. **WSL路径转换**：Windows使用WSL时自动处理Windows路径与Linux路径转换
-5. **网络需求**：首次下载题目需联网，答题过程可离线
-6. **加密限制**：内置密钥可被反编译获取，主要防无意查看，不防专业破解
-7. **随机一致性**：基于机器硬件信息，更换电脑会导致抽题结果变化
-8. **testbench规范**：老师需确保testbench与reference.v端口一致，且包含`$dumpfile`用于生成VCD
-9. **数值对比**：result_analyzer模块已实现$display输出解析和对比逻辑，但当前UI测试流程中尚未调用展示
+1. **零第三方 Python 依赖**：后端仅用标准库（HTTP 用 http.server，网络用 urllib，加密用 hashlib），新增依赖需重新评估打包风险；
+2. **前端零构建**：只允许原生 ES Modules + vendored 库，不引入 npm/打包器；
+3. **URL 不明文**：服务器地址不得出现在明文源码、日志、API 返回、界面上；
+4. **明文不落盘**：reference.v 仅在内存解密，临时文件用完即删；
+5. **RTL 视图边界**：仅学生代码、仅可综合子集；报错时引导看波形；
+6. **同步安全**：manifest 拉取失败或 schema 非法时必须中止同步，不得删除任何本地数据；
+7. **威胁模型**：内置密钥与 URL 混淆防无意查看，不防专业破解，与 v1 一致；
+8. **版本锁定**：iverilog/GTKWave/Yosys 手册指定小版本，程序检测到不匹配时警告但不阻断。

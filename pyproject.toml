@@ -1,46 +1,10 @@
 [project]
 name = "verilog-quiz-system"
-version = "0.1.0"
-description = "Verilog作业考试系统 - 单机版GUI程序"
+version = "2.0.0"
+description = "Verilog作业考试系统 - 单机版（本地后端 + 浏览器前端）"
 readme = "README.md"
 requires-python = ">=3.11"
-dependencies = [
-    "cryptography>=46.0.6",
-    "flet==0.83.1",
-    "flet-desktop==0.83.1",
-    "requests>=2.33.1",
-]
-
-[tool.flet]
-icon = "assets/icon.png"
-
-[tool.flet.app]
-exclude = [
-    ".git",
-    ".github",
-    ".venv",
-    "__pycache__",
-    "AGENTS.md",
-    "DEV_PROGRESS.md",
-    "README.md",
-    "Manual for EIE330 Students.md",
-    "LICENSE",
-    "uv.lock",
-    ".python-version",
-    ".gitignore",
-    ".gitattributes",
-    "debug_check.py",
-    "encrypt_refs.py",
-    "fix_draw_result.py",
-    "fix_server_encoding.py",
-    "setup_local_data.py",
-    "setup_test_server.py",
-    "test_server",
-    "scripts",
-    "questions",
-    "submissions",
-    "reports",
-]
+dependencies = []
 
 [dependency-groups]
 dev = [
