@@ -301,9 +301,10 @@ Windows 优先调用原生 iverilog/GTKWave，失败时 fallback 到 WSL（保�
 - **CI matrix**：`windows-latest`（x64）、`macos-14`（arm64）、`ubuntu-22.04`（x64）、`ubuntu-24.04-arm`；
 - **无头端到端冒烟**（Web架构的红利）：每个平台产物启动后 `curl /api/health` 验证服务可用；Linux runner 上安装 iverilog+yosys，通过 API 无头跑完"同步→写码→仿真→RTL→报告"全流程；
 - **分支分工**：
-  - `push 到 dev`：四平台构建 + 冒烟 + 上传 artifacts，**不创建 Release**（仅验证打包流程，产物可从 Actions 页下载试跑）；
+  - `push 到 dev / v2-rewrite`：四平台构建 + 冒烟 + 上传 artifacts，**不创建 Release**（仅验证打包流程，产物可从 Actions 页下载试跑）；
   - `push 到 main`（含 PR 合并）：四平台构建 + 冒烟 + 自动创建 GitHub Release 分发 zip；
-  - 两分支均保留 workflow_dispatch 手动触发。
+  - 两分支均保留 workflow_dispatch 手动触发；
+  - 冒烟逻辑在 `scripts/ci_smoke.py`（可本地复用），新增 week1 题目需在 CODE_MAP 中补充正确实现。
 
 ---
 

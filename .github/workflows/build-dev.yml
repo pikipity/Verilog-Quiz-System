@@ -1,10 +1,13 @@
-name: Build Dev
+name: Build Test (dev)
 
-# 只允许手动触发，用于测试打包流程
+# dev / v2-rewrite 分支：四平台构建 + 冒烟，只产出 artifacts，不创建 Release
 on:
+  push:
+    branches:
+      - dev
+      - v2-rewrite
   workflow_dispatch:
 
-# 使用 Node.js 24（消除 deprecation 警告）
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
@@ -17,12 +20,19 @@ jobs:
         include:
           - os: windows-latest
             target: windows
+            exe: verilog-quiz-system.exe
+          - os: macos-14
+            target: macos-arm64
+            exe: verilog-quiz-system
           - os: ubuntu-22.04
             target: linux
-          - os: macos-latest
-            target: macos
+            exe: verilog-quiz-system
+          - os: ubuntu-24.04-arm
+            target: linux-arm64
+            exe: verilog-quiz-system
 
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
 
     steps:
       - name: Checkout code
@@ -33,28 +43,52 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Install dependencies
+      - name: Install PyInstaller
+        run: python -m pip install "pyinstaller>=6.19"
+
+      - name: Build with PyInstaller
+        run: pyinstaller verilog-quiz.spec --noconfirm --clean
+
+      - name: Smoke test (basic)
+        shell: bash
+        env:
+          VERILOG_QUIZ_NO_BROWSER: "1"
+          VERILOG_QUIZ_PORT: "8899"
+          VERILOG_QUIZ_TOKEN: "ci-token"
+          VERILOG_QUIZ_WATCHDOG_TIMEOUT: "600"
         run: |
-          python -m pip install --upgrade pip
-          pip install pyinstaller flet cryptography requests
+          ./dist/verilog-quiz-system/${{ matrix.exe }} &
+          python scripts/ci_smoke.py --port 8899 --token ci-token
 
-      - name: Install flet-desktop
-        run: pip install flet-desktop
+      - name: Full E2E (Linux x64: iverilog/yosys + test question server)
+        if: matrix.target == 'linux'
+        shell: bash
+        run: |
+          sudo apt-get update && sudo apt-get install -y iverilog yosys
+          python -c "from setup_test_server import create_test_data; create_test_data()"
+          (cd test_server && python -m http.server 8090 --bind 127.0.0.1 &)
+          sleep 2
+          VERILOG_QUIZ_NO_BROWSER=1 VERILOG_QUIZ_PORT=8899 VERILOG_QUIZ_TOKEN=ci-token \
+            VERILOG_QUIZ_WATCHDOG_TIMEOUT=600 \
+            VERILOG_QUIZ_SERVER_URL=http://127.0.0.1:8090/verilog-quiz \
+            ./dist/verilog-quiz-system/verilog-quiz-system &
+          sleep 2
+          python scripts/ci_smoke.py --port 8899 --token ci-token --full
 
-      - name: Build executable
-        run: >
-          pyinstaller --onefile --name verilog-quiz-${{ matrix.target }}-dev --clean
-          --windowed --noconsole
-          --hidden-import=flet_desktop
-          --hidden-import=flet.utils.pip
-          --collect-all flet
-          --collect-all flet_desktop
-          main.py
+      - name: Package zip
+        shell: bash
+        run: |
+          mkdir -p release
+          if [ "${{ matrix.target }}" = "windows" ]; then
+            python -c "import shutil; shutil.make_archive('release/verilog-quiz-${{ matrix.target }}', 'zip', 'dist/verilog-quiz-system')"
+          else
+            (cd dist/verilog-quiz-system && zip -r "$GITHUB_WORKSPACE/release/verilog-quiz-${{ matrix.target }}.zip" .)
+          fi
+          ls -lh release/
 
-      # 开发版本只上传 artifact，不创建 Release
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: verilog-quiz-${{ matrix.target }}-dev
-          path: dist/*
-          retention-days: 7
+          name: verilog-quiz-${{ matrix.target }}
+          path: release/*.zip
+          retention-days: 30

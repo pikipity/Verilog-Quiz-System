@@ -1,20 +1,16 @@
 name: Build Release
 
-# 触发条件：只有 main 分支的 push 才触发（包括 PR 合并）
+# main 分支：四平台构建 + 冒烟 + 自动创建 Release 分发
 on:
   push:
     branches:
       - main
-
-  # 允许手动触发
   workflow_dispatch:
 
-# 权限设置
 permissions:
-  contents: write    # 用于创建 Release
+  contents: write
   actions: read
 
-# 使用 Node.js 24（消除 deprecation 警告）
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
@@ -22,173 +18,77 @@ jobs:
   build:
     name: Build ${{ matrix.target }}
     strategy:
-      fail-fast: false    # 一个平台失败不影响其他平台
+      fail-fast: false
       matrix:
         include:
+          - os: windows-latest
+            target: windows
+            exe: verilog-quiz-system.exe
+          - os: macos-14
+            target: macos-arm64
+            exe: verilog-quiz-system
           - os: ubuntu-22.04
             target: linux
-            ext: ''
-            build_cmd: linux
+            exe: verilog-quiz-system
           - os: ubuntu-24.04-arm
             target: linux-arm64
-            ext: ''
-            build_cmd: linux
+            exe: verilog-quiz-system
 
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 45
-    env:
-      PYTHONIOENCODING: utf-8
-      PYTHONLEGACYWINDOWSSTDIO: utf-8
+    timeout-minutes: 30
 
     steps:
-      # ========== 1. 检出代码 ==========
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # ========== 2. 安装 Linux 系统依赖（x64 & ARM64）==========
-      - name: Install Linux dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y clang cmake ninja-build pkg-config libblkid-dev liblzma-dev libgtk-3-dev libstdc++-12-dev
-
-      # ========== 3. ARM64 预装 Flutter SDK ==========
-      # flet 0.83.1 绑定 Flutter 3.41.4；Flutter 官方未提供 Linux ARM64 预编译包，
-      # 故通过 git clone 获取，让 flutter 工具自行下载对应架构的 Dart SDK。
-      - name: Setup Flutter SDK (ARM64)
-        if: matrix.target == 'linux-arm64'
-        run: |
-          echo "Installing Flutter SDK 3.41.4 for ARM64..."
-          git clone https://github.com/flutter/flutter.git -b 3.41.4 --depth 1 "$HOME/flutter"
-          export PATH="$HOME/flutter/bin:$PATH"
-          echo "$HOME/flutter/bin" >> "$GITHUB_PATH"
-          flutter config --no-analytics
-          flutter precache --linux
-          flutter --version
-
-      # ========== 4. 设置 Python ==========
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
-      # ========== 5. 安装 Python 依赖 ==========
-      - name: Install dependencies
+      - name: Install PyInstaller
+        run: python -m pip install "pyinstaller>=6.19"
+
+      - name: Build with PyInstaller
+        run: pyinstaller verilog-quiz.spec --noconfirm --clean
+
+      - name: Smoke test (basic)
+        shell: bash
+        env:
+          VERILOG_QUIZ_NO_BROWSER: "1"
+          VERILOG_QUIZ_PORT: "8899"
+          VERILOG_QUIZ_TOKEN: "ci-token"
+          VERILOG_QUIZ_WATCHDOG_TIMEOUT: "600"
         run: |
-          python -m pip install --upgrade pip
-          pip install flet==0.83.1 flet-desktop==0.83.1 cryptography requests
+          ./dist/verilog-quiz-system/${{ matrix.exe }} &
+          python scripts/ci_smoke.py --port 8899 --token ci-token
 
-      # ========== 6. 用 flet build 打包 ==========
-      - name: Build with flet (Linux x64)
+      - name: Full E2E (Linux x64: iverilog/yosys + test question server)
         if: matrix.target == 'linux'
-        run: yes | flet build ${{ matrix.build_cmd }} --output dist --clear-cache
-
-      - name: Build with flet (Linux ARM64)
-        if: matrix.target == 'linux-arm64'
-        run: yes | flet build ${{ matrix.build_cmd }} --output dist --clear-cache
-
-      # ========== 7. 整理构建产物：清理开发文件并打包成 zip ==========
-      - name: Prepare artifact
         shell: bash
         run: |
-          set -e
-          # flet build --output dist 直接输出到 dist/ 目录
-          if [ -f "dist/verilog-quiz-system" ] || [ -d "dist/verilog-quiz-system" ] || [ -f "dist/verilog-quiz-system.exe" ] || [ -d "dist/verilog-quiz-system.app" ]; then
-            PLATFORM_DIR="dist"
-          elif [ -d "dist/${{ matrix.target }}" ]; then
-            PLATFORM_DIR="dist/${{ matrix.target }}"
-          elif [ -d "build/${{ matrix.target }}" ]; then
-            PLATFORM_DIR="build/${{ matrix.target }}"
-          else
-            echo "ERROR: flet build output not found!"
-            echo "Contents of dist/:"
-            ls -la dist/ 2>/dev/null || true
-            echo "Contents of build/:"
-            ls -la build/ 2>/dev/null || true
-            exit 1
-          fi
+          sudo apt-get update && sudo apt-get install -y iverilog yosys
+          python -c "from setup_test_server import create_test_data; create_test_data()"
+          (cd test_server && python -m http.server 8090 --bind 127.0.0.1 &)
+          sleep 2
+          VERILOG_QUIZ_NO_BROWSER=1 VERILOG_QUIZ_PORT=8899 VERILOG_QUIZ_TOKEN=ci-token \
+            VERILOG_QUIZ_WATCHDOG_TIMEOUT=600 \
+            VERILOG_QUIZ_SERVER_URL=http://127.0.0.1:8090/verilog-quiz \
+            ./dist/verilog-quiz-system/verilog-quiz-system &
+          sleep 2
+          python scripts/ci_smoke.py --port 8899 --token ci-token --full
 
-          echo "Original size before cleanup:"
-          du -sh "$PLATFORM_DIR" || true
-          echo "---"
-
-          # ========== 清理不需要的 Flutter SDK 开发文件 ==========
-          # 这些文件被 flet build 带入输出目录，运行时完全不需要，
-          # 但会占用大量磁盘空间（dart-sdk 可达 500MB+）
-
-          # 0. 删除可能被误打包进来的完整 Flutter SDK 目录
-          find "$PLATFORM_DIR" -maxdepth 2 -type d -name "flutter" -exec rm -rf {} + 2>/dev/null || true
-
-          # 1. 删除 dart-sdk 完整目录（开发工具，运行时不需要）
-          find "$PLATFORM_DIR" -type d -name "dart-sdk" -exec rm -rf {} + 2>/dev/null || true
-
-          # 2. 删除 Flutter 开发工具快照
-          find "$PLATFORM_DIR" -type f \( \
-            -name "flutter_tools.snapshot" -o \
-            -name "analysis_server.dart.snapshot" -o \
-            -name "dart2js.dart.snapshot" -o \
-            -name "gen_snapshot" -o \
-            -name "dart" -o \
-            -name "dart.exe" \
-          \) -delete 2>/dev/null || true
-
-          # 3. 删除缓存中的构建产物和包缓存（保留 engine 库）
-          find "$PLATFORM_DIR" -type d -path "*/flutter/bin/cache/artifacts" -exec rm -rf {} + 2>/dev/null || true
-          find "$PLATFORM_DIR" -type d -path "*/flutter/bin/cache/pkg" -exec rm -rf {} + 2>/dev/null || true
-
-          # 4. 删除示例、文档、测试代码
-          find "$PLATFORM_DIR" -type d \( \
-            -name "examples" -o \
-            -name "example" -o \
-            -name "docs" -o \
-            -name "doc" -o \
-            -name "test" -o \
-            -name "tests" -o \
-            -name "benchmark" -o \
-            -name "dev" \
-          \) -exec rm -rf {} + 2>/dev/null || true
-
-          # 5. 删除静态库（.a）和符号表（运行时只需要 .so/.dll/.dylib）
-          find "$PLATFORM_DIR" -type f -name "*.a" -delete 2>/dev/null || true
-
-          # 6. 删除头文件和开发用的 C++ 源码
-          find "$PLATFORM_DIR" -type f \( -name "*.h" -o -name "*.hpp" -o -name "*.cc" -o -name "*.cpp" \) -delete 2>/dev/null || true
-
-          # 7. 删除不需要的字体缓存和中间文件
-          find "$PLATFORM_DIR" -type f -name "*.stamp" -delete 2>/dev/null || true
-          find "$PLATFORM_DIR" -type f -name "*.d" -delete 2>/dev/null || true
-
-          echo "Size after cleanup:"
-          du -sh "$PLATFORM_DIR" || true
-          echo "---"
-          echo "Files remaining in $PLATFORM_DIR:"
-          ls -la "$PLATFORM_DIR"
-
-          # ========== 创建 Linux .desktop 启动器和图标 ==========
-          if [ -f "assets/icon.png" ]; then
-            cp assets/icon.png "$PLATFORM_DIR/verilog-quiz-system.png"
-            echo "Copied icon to $PLATFORM_DIR/verilog-quiz-system.png"
-          fi
-          # Copy install.sh and .desktop from repo
-          cp scripts/install.sh "$PLATFORM_DIR/install.sh"
-          cp scripts/verilog-quiz-system.desktop "$PLATFORM_DIR/verilog-quiz-system.desktop"
-          chmod +x "$PLATFORM_DIR/install.sh"
-          chmod +x "$PLATFORM_DIR/verilog-quiz-system.desktop"
-          echo "Copied install.sh and .desktop"
-
-          # ========== 打包 ==========
+      - name: Package zip
+        shell: bash
+        run: |
           mkdir -p release
-          ZIP_NAME="verilog-quiz-${{ matrix.target }}.zip"
           if [ "${{ matrix.target }}" = "windows" ]; then
-            # Windows: Python 打包整个 dist/ 目录
-            python -c "import shutil; shutil.make_archive('release/verilog-quiz-${{ matrix.target }}', 'zip', '$PLATFORM_DIR')"
+            python -c "import shutil; shutil.make_archive('release/verilog-quiz-${{ matrix.target }}', 'zip', 'dist/verilog-quiz-system')"
           else
-            # Linux: 用 zip 命令保留 Unix 权限
-            (cd "$PLATFORM_DIR" && zip -r "$(pwd)/../release/$ZIP_NAME" .)
+            (cd dist/verilog-quiz-system && zip -r "$GITHUB_WORKSPACE/release/verilog-quiz-${{ matrix.target }}.zip" .)
           fi
-          echo "Created: release/$ZIP_NAME"
           ls -lh release/
 
-      # ========== 8. 上传构建产物 ==========
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
@@ -196,7 +96,6 @@ jobs:
           path: release/*.zip
           retention-days: 30
 
-  # ========== Release Job：只有 x64 和 ARM64 都成功才执行 ==========
   release:
     name: Create Release
     needs: build
@@ -204,54 +103,44 @@ jobs:
     permissions:
       contents: write
     steps:
-      - name: Download Linux x64 artifact
+      - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
-          name: verilog-quiz-linux
-          path: release/
-
-      - name: Download Linux ARM64 artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: verilog-quiz-linux-arm64
           path: release/
 
       - name: List release files
-        run: ls -lh release/
+        run: ls -lh release/*/
 
       - name: Create Release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
           tag_name: v2.0.${{ github.run_number }}
-          name: Release v2.0.${{ github.run_number }}
+          name: Verilog Quiz System v2.0.${{ github.run_number }}
           body: |
             ## Verilog Quiz System v2.0.${{ github.run_number }}
 
-            自动构建版本（flet build，开箱即用）
+            v2 架构：本地后端 + 浏览器前端，免安装解压即用。无需虚拟机。
+
+            ### 下载
+
+            | 文件 | 平台 |
+            |------|------|
+            | `verilog-quiz-windows.zip` | Windows 10/11 (x64) |
+            | `verilog-quiz-macos-arm64.zip` | macOS (Apple Silicon) |
+            | `verilog-quiz-linux.zip` | Linux x64 (Ubuntu 22.04+) |
+            | `verilog-quiz-linux-arm64.zip` | Linux ARM64 |
+
+            ### 使用
+
+            1. 解压后双击运行，浏览器自动打开界面
+            2. 需预装锁定版本工具：iverilog 11.0 / GTKWave 3.3.104 / Yosys 0.9
+            3. 详见仓库内《Manual for EIE330 Students.md》
 
             ### 构建信息
+
             - 提交: ${{ github.sha }}
-            - 提交者: ${{ github.event.head_commit.author.name }}
-            - 提交信息: ${{ github.event.head_commit.message }}
             - 构建时间: ${{ github.event.head_commit.timestamp }}
-
-            ### 下载说明
-            1. 下载对应平台的 **zip 文件**
-            2. 解压到任意目录
-            3. 运行安装脚本：`./install.sh`
-            4. 从应用菜单启动 "Verilog Quiz System"
-            5. 或直接运行：`./verilog-quiz-system`
-
-            ### 下载文件
-            | 文件 | 平台 | 架构 | 说明 |
-            |------|------|------|------|
-            | `verilog-quiz-linux.zip` | Ubuntu 22.04+ | x64 | 解压后运行 install.sh 安装，或直接用命令行启动 |
-            | `verilog-quiz-linux-arm64.zip` | Ubuntu 24.04+ | ARM64 | 解压后运行 install.sh 安装，或直接用命令行启动 |
-
-            ### 系统要求
-            - **Linux**: Ubuntu 22.04+ (x64) / Ubuntu 24.04+ (ARM64)，需预装 iverilog 和 GTKWave
-            - **图标显示**: 直接双击 `.desktop` 文件可能无法启动（系统安全限制），请先运行 `./install.sh` 安装到应用菜单
-          files: release/*.zip
+          files: release/*/*.zip
           draft: false
           prerelease: false
         env:

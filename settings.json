@@ -1,6 +1,6 @@
 {
-  "student_id": "123456",
-  "name": "abcd asdsad sadad",
+  "student_id": "ci0001",
+  "name": "CI Bot",
   "tool_paths": {
     "iverilog": "",
     "gtkwave": "",
