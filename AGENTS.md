@@ -127,6 +127,7 @@ Verilog-Quiz-System/
 | `POST /api/questions/{week}/{qid}/gtkwave?which=student\|ref` | 拉起GTKWave |
 | `POST /api/questions/{week}/{qid}/rtl` | Yosys生成RTL JSON（或错误输出） |
 | `POST /api/reports/{week}/generate` / `GET /api/reports/{week}` / `POST /api/reports/{week}/open_folder` | 报告生成/预览/打开位置 |
+| `POST /api/open_data_folder` | 打开数据目录（顶部导航 Data Folder 按钮） |
 
 ---
 
@@ -276,13 +277,13 @@ Windows 优先调用原生 iverilog/GTKWave，失败时 fallback 到 WSL（保�
 
 ## 界面设计
 
-五个页面（单页应用，hash 路由）：
+**界面语言为英文**（含后端返回的所有用户可见文案）。五个页面（单页应用，hash 路由）：
 
-1. **设置页**：学号（必填）、姓名、三个工具的手动路径覆盖（可选）、服务器连接测试；
-2. **周次列表页**：周次卡片（已尝试进度）、[检查更新]按钮、同步摘要弹窗（新增/更新/移除）、[打开数据目录]；
-3. **答题页**：题面（Markdown渲染含图片）、CodeMirror 编辑器（Verilog高亮+行号）、testbench 只读区、测试按钮与结果面板（状态 + 波形两按钮 + RTL标签页）、[上一题][保存并继续]；
-4. **报告页**：进入即自动生成最新报告（无生成按钮）、报告预览、[打开文件位置]；
-5. **诊断页**：四工具三级验证表格（状态灯/检测版本vs锁定版本/路径）、[运行自检]、[测试打开GTKWave]、[一键复制诊断信息]。
+1. **设置页**（Settings）：Student ID（必填）、Name、Tool paths（可选覆盖）、Test Server Connection；
+2. **周次列表页**（Weeks）：周次卡片（Attempted 进度）、[Check Update] 按钮、同步摘要（Added/Updated/Removed）；顶部导航另有 [Data Folder] 按钮打开数据目录；
+3. **答题页**（Question）：Question Description（Markdown 渲染含图片）、Code Editor（Verilog 高亮+行号）、Testbench 只读区、[Run Test] 与结果面板（点击后先清空旧结果显示"⏳ Running test, waiting for result…"再更新；含 View Expected/Your Waveform 两按钮）、RTL View 卡片、[Previous] [Save & Continue]；
+4. **报告页**（Report）：进入即自动生成最新报告（无生成按钮）、预览、[Open File Location]；
+5. **诊断页**（Diagnostics）：工具三级验证表格（状态灯/Detected vs Pinned/Location）、[Run Self-Check]、[Test-launch GTKWave]、[Copy Diagnostics]。
 
 ---
 
@@ -385,4 +386,5 @@ uv run python main.py
 5. **RTL 视图边界**：仅学生代码、仅可综合子集；报错时引导看波形；
 6. **同步安全**：manifest 拉取失败或 schema 非法时必须中止同步，不得删除任何本地数据；
 7. **威胁模型**：内置密钥与 URL 混淆防无意查看，不防专业破解，与 v1 一致；
-8. **版本锁定**：iverilog/GTKWave/Yosys 手册指定小版本，程序检测到不匹配时警告但不阻断。
+8. **版本锁定**：iverilog/GTKWave/Yosys 手册指定小版本，程序检测到不匹配时警告但不阻断；
+9. **子进程静默参数**：windowed 程序中所有 subprocess 调用必须用 `tool_runner` 的静默参数（stdin=DEVNULL、Windows 加 CREATE_NO_WINDOW），否则 wsl.exe 等控制台程序会间歇性报 0xc0000142；启动类错误重试一次。

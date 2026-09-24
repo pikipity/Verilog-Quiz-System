@@ -6,29 +6,29 @@ export async function renderSettings(root) {
   const hasId = !!s.student_id;
 
   root.innerHTML = `
-    <h2>设置</h2>
+    <h2>Settings</h2>
     <form id="settings-form" class="card form">
-      <label>学号 <span class="req">*</span>
+      <label>Student ID <span class="req">*</span>
         <input name="student_id" required value="${escapeHtml(s.student_id)}">
       </label>
-      <label>姓名
+      <label>Name
         <input name="name" value="${escapeHtml(s.name)}">
       </label>
       <fieldset>
-        <legend>工具路径（可选，留空则自动检测）</legend>
+        <legend>Tool paths (optional — auto-detected if empty)</legend>
         <label>iverilog
-          <input name="tp_iverilog" value="${escapeHtml(s.tool_paths.iverilog)}" placeholder="如 C:\\iverilog\\bin\\iverilog.exe">
+          <input name="tp_iverilog" value="${escapeHtml(s.tool_paths.iverilog)}" placeholder="e.g. C:\\iverilog\\bin\\iverilog.exe">
         </label>
         <label>GTKWave
-          <input name="tp_gtkwave" value="${escapeHtml(s.tool_paths.gtkwave)}" placeholder="如 C:\\Program Files\\GTKWave\\bin\\gtkwave.exe">
+          <input name="tp_gtkwave" value="${escapeHtml(s.tool_paths.gtkwave)}" placeholder="e.g. C:\\Program Files\\GTKWave\\bin\\gtkwave.exe">
         </label>
         <label>Yosys
-          <input name="tp_yosys" value="${escapeHtml(s.tool_paths.yosys)}" placeholder="如 C:\\yosys\\yosys.exe">
+          <input name="tp_yosys" value="${escapeHtml(s.tool_paths.yosys)}" placeholder="e.g. C:\\oss-cad-suite\\bin\\yosys.exe">
         </label>
       </fieldset>
       <div class="actions">
-        <button type="submit">保存</button>
-        <button type="button" class="secondary" id="check-server">测试服务器连接</button>
+        <button type="submit">Save</button>
+        <button type="button" class="secondary" id="check-server">Test Server Connection</button>
       </div>
       <p id="msg" class="msg"></p>
     </form>
@@ -42,12 +42,12 @@ export async function renderSettings(root) {
     const newId = form.student_id.value.trim();
 
     if (hasId && newId !== s.student_id) {
-      const ok = confirm('修改学号将清空本机全部题目与代码数据，且无法恢复。\n确定修改学号吗？');
+      const ok = confirm('Changing the student ID will erase ALL local questions and code on this machine. This cannot be undone.\n\nContinue?');
       if (!ok) return;
     }
 
     msg.className = 'msg';
-    msg.textContent = '保存中…';
+    msg.textContent = 'Saving...';
     try {
       const result = await api('/api/settings', {
         method: 'PUT',
@@ -62,7 +62,9 @@ export async function renderSettings(root) {
         },
       });
       msg.className = 'msg ok';
-      msg.textContent = result.wiped ? '已保存。原学号的本地数据已清空。' : '已保存。';
+      msg.textContent = result.wiped
+        ? 'Saved. Local data of the previous student ID has been wiped.'
+        : 'Saved.';
       setTimeout(() => { location.hash = '#/weeks'; }, 600);
     } catch (err) {
       msg.className = 'msg err';
@@ -72,11 +74,11 @@ export async function renderSettings(root) {
 
   root.querySelector('#check-server').addEventListener('click', async () => {
     msg.className = 'msg';
-    msg.textContent = '正在连接…';
+    msg.textContent = 'Connecting...';
     try {
       const result = await api('/api/server/check', { method: 'POST' });
       msg.className = 'msg ok';
-      msg.textContent = `连接成功，服务器上有 ${result.weeks} 个周次。`;
+      msg.textContent = `Connected. The server has ${result.weeks} week(s).`;
     } catch (err) {
       msg.className = 'msg err';
       msg.textContent = err.message;

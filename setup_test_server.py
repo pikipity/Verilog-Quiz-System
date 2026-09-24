@@ -38,28 +38,31 @@ def create_test_data():
     base_dir = "test_server/verilog-quiz"
     os.makedirs(base_dir, exist_ok=True)
     
-    # 定义题目（使用ID与folder分离）
+    # 定义题目（使用ID与folder分离；inputs/outputs 显式区分方向）
     questions_data = [
         {
             "id": "mux2to1_v1",
             "folder": "q1",
             "title": "2选1数据选择器",
             "module": "mux2to1",
-            "ports": ["a", "b", "sel", "y"]
+            "inputs": ["a", "b", "sel"],
+            "outputs": ["y"]
         },
         {
             "id": "and2_v1",
             "folder": "q2",
             "title": "2输入与门",
             "module": "and2",
-            "ports": ["a", "b", "y"]
+            "inputs": ["a", "b"],
+            "outputs": ["y"]
         },
         {
             "id": "halfadder_v1",
             "folder": "q3",
             "title": "半加器",
             "module": "half_adder",
-            "ports": ["a", "b", "sum", "cout"]
+            "inputs": ["a", "b"],
+            "outputs": ["sum", "cout"]
         }
     ]
     
@@ -123,9 +126,10 @@ def _create_questions_for_week(week_dir, questions_data):
 | 端口 | 方向 | 位宽 | 说明 |
 |------|------|------|------|
 """
-            for port in q['ports'][:-1]:
+            for port in q['inputs']:
                 md_content += f"| {port} | input | 1 | 输入 |\n"
-            md_content += f"| {q['ports'][-1]} | output | 1 | 输出 |\n"
+            for port in q['outputs']:
+                md_content += f"| {port} | output | 1 | 输出 |\n"
             
             md_content += """
 ## 提示
@@ -179,15 +183,18 @@ endmodule
 
 module tb_{q['module']};
 """
-            for port in q['ports'][:-1]:
+            all_ports = q['inputs'] + q['outputs']
+            for port in q['inputs']:
                 tb += f"    reg {port};\n"
-            tb += f"    wire {q['ports'][-1]};\n\n"
-            
+            for port in q['outputs']:
+                tb += f"    wire {port};\n"
+            tb += "\n"
+
             tb += f"    {q['module']} dut (\n"
-            for port in q['ports']:
+            for port in all_ports:
                 tb += f"        .{port}({port}),\n"
             tb = tb.rstrip(",\n") + "\n    );\n\n"
-            
+
             tb += """    initial begin
         $dumpfile("wave.vcd");
         $dumpvars(0, tb_""" + q['module'] + """);
@@ -196,30 +203,30 @@ module tb_{q['module']};
         
         // Test case 1
         #0 """
-            
-            for port in q['ports'][:-1]:
+
+            for port in q['inputs']:
                 tb += f"{port}=0; "
             tb = tb.rstrip() + "\n"
             tb += "        #1 $display(\"time=%0t"
-            for port in q['ports']:
+            for port in all_ports:
                 tb += f" {port}=%b"
             tb += "\","
             tb += " $time"
-            for port in q['ports']:
+            for port in all_ports:
                 tb += f", {port}"
             tb += ");\n\n"
-            
+
             tb += """        // Test case 2
         #10 """
-            for i, port in enumerate(q['ports'][:-1]):
+            for i, port in enumerate(q['inputs']):
                 tb += f"{port}={i%2}; "
             tb = tb.rstrip() + "\n"
             tb += "        #1 $display(\"time=%0t"
-            for port in q['ports']:
+            for port in all_ports:
                 tb += f" {port}=%b"
             tb += "\","
             tb += " $time"
-            for port in q['ports']:
+            for port in all_ports:
                 tb += f", {port}"
             tb += ");\n\n"
             

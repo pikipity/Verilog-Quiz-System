@@ -15,7 +15,7 @@ import shutil
 import subprocess
 
 import config
-from core.tool_runner import ToolRunner
+from core.tool_runner import ToolRunner, popen_kwargs
 from core.code_executor import CodeExecutor
 from backend.services import settings_service
 
@@ -144,19 +144,19 @@ def run_selfcheck() -> dict:
     # 1. iverilog 编译 + vvp 仿真
     executor = CodeExecutor(overrides.get("iverilog", ""))
     if not executor.available:
-        checks.append({"name": "iverilog 编译+仿真", "ok": False, "detail": "未检测到 iverilog"})
+        checks.append({"name": "iverilog compile + simulate", "ok": False, "detail": "iverilog not detected"})
     else:
         result = executor.execute(["selfcheck.v", "tb_selfcheck.v"], work_dir, "sc.vvp")
         if result.run_success and "SC y=1" in result.output:
-            checks.append({"name": "iverilog 编译+仿真", "ok": True, "detail": "编译并仿真通过"})
+            checks.append({"name": "iverilog compile + simulate", "ok": True, "detail": "Compile and simulation passed"})
         else:
-            detail = result.error or result.output or "仿真结果不符预期"
-            checks.append({"name": "iverilog 编译+仿真", "ok": False, "detail": detail[:300]})
+            detail = result.error or result.output or "Unexpected simulation output"
+            checks.append({"name": "iverilog compile + simulate", "ok": False, "detail": detail[:300]})
 
     # 2. yosys 网表生成
     yosys = _make_runner("yosys", ["-V"], overrides.get("yosys", ""))
     if not yosys.available:
-        checks.append({"name": "yosys 网表生成", "ok": False, "detail": "未检测到 yosys"})
+        checks.append({"name": "yosys netlist generation", "ok": False, "detail": "Yosys not detected"})
     else:
         ok, stdout, stderr = yosys.run(
             ['-p', 'read_verilog selfcheck.v; hierarchy -auto-top; proc; write_json sc.json'],
@@ -169,10 +169,10 @@ def run_selfcheck() -> dict:
             except (OSError, json.JSONDecodeError):
                 json_ok = False
         if json_ok:
-            checks.append({"name": "yosys 网表生成", "ok": True, "detail": "RTL 网表生成通过"})
+            checks.append({"name": "yosys netlist generation", "ok": True, "detail": "RTL netlist generation passed"})
         else:
-            checks.append({"name": "yosys 网表生成", "ok": False,
-                           "detail": (stderr or stdout or "输出解析失败")[:300]})
+            checks.append({"name": "yosys netlist generation", "ok": False,
+                           "detail": (stderr or stdout or "Failed to parse output")[:300]})
 
     # 3. GTKWave（无法无头验证，只报告探测结果）
     gtk = _tool_entry({"name": "gtkwave", "display": "GTKWave", "version_args": ["--version"]},
@@ -180,7 +180,7 @@ def run_selfcheck() -> dict:
     checks.append({
         "name": "GTKWave",
         "ok": gtk["found"],
-        "detail": "已找到，请点击「测试打开 GTKWave」目视确认窗口弹出" if gtk["found"] else "未找到 GTKWave",
+        "detail": "Found. Click 'Test-launch GTKWave' to confirm the window opens." if gtk["found"] else "GTKWave not found",
     })
 
     return {"ok": all(c["ok"] for c in checks), "checks": checks}
@@ -192,15 +192,13 @@ def test_open_gtkwave() -> dict:
     override = settings.get("tool_paths", {}).get("gtkwave", "")
     runner = _make_runner("gtkwave", ["--version"], override)
     if not runner.available:
-        return {"ok": False, "error": "未检测到 GTKWave，请按安装手册安装或在设置页指定路径。"}
+        return {"ok": False, "error": "GTKWave not detected. Install it per the manual, or set its path in Settings."}
 
     try:
         if runner.use_wsl:
-            subprocess.Popen(['wsl', 'DISPLAY=:0', 'gtkwave'],
-                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            subprocess.Popen(['wsl', 'DISPLAY=:0', 'gtkwave'], **popen_kwargs())
         else:
-            subprocess.Popen([runner.exe],
-                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        return {"ok": True, "message": "已尝试启动 GTKWave，请确认窗口是否弹出。"}
+            subprocess.Popen([runner.exe], **popen_kwargs())
+        return {"ok": True, "message": "GTKWave launch attempted — please confirm the window opened."}
     except Exception as e:
-        return {"ok": False, "error": f"启动失败: {e}"}
+        return {"ok": False, "error": f"Launch failed: {e}"}

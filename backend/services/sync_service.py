@@ -26,14 +26,14 @@ def _validate_manifest(manifest) -> tuple:
     结构非法（非JSON对象、weeks缺失或格式错）一律中止。
     """
     if not isinstance(manifest, dict):
-        return False, "manifest 不是合法 JSON 对象"
+        return False, "manifest is not a valid JSON object"
     weeks = manifest.get("weeks")
     if not isinstance(weeks, list) or not all(
         isinstance(w, str) and re.fullmatch(r'week\d+', w) for w in weeks
     ):
-        return False, "manifest.weeks 结构非法"
+        return False, "manifest.weeks has invalid structure"
     if "schema_version" in manifest and manifest["schema_version"] not in SUPPORTED_SCHEMA_VERSIONS:
-        return False, f"manifest schema_version 不受支持: {manifest['schema_version']}"
+        return False, f"unsupported manifest schema_version: {manifest['schema_version']}"
     return True, ""
 
 
@@ -42,10 +42,10 @@ def check_server() -> dict:
     try:
         manifest = qm.fetch_json(f"{config.get_server_url()}/manifest.json")
     except Exception:
-        return {"ok": False, "error": "无法连接题目服务器"}
+        return {"ok": False, "error": "Cannot reach the question server"}
     ok, error = _validate_manifest(manifest)
     if not ok:
-        return {"ok": False, "error": f"题目清单格式不兼容（{error}），请联系老师检查 manifest"}
+        return {"ok": False, "error": f"Manifest incompatible ({error}). Please ask your instructor to check it."}
     return {"ok": True, "weeks": len(manifest["weeks"])}
 
 
@@ -60,16 +60,17 @@ def run_sync() -> dict:
     settings = settings_service.load_settings()
     student_id = settings.get("student_id", "").strip()
     if not student_id:
-        return {"ok": False, "need_settings": True, "error": "请先在设置页填写学号"}
+        return {"ok": False, "need_settings": True, "error": "Please set your student ID on the Settings page first"}
 
     base = config.get_server_url()
     try:
         manifest = qm.fetch_json(f"{base}/manifest.json")
     except Exception:
-        return {"ok": False, "error": "无法连接题目服务器，本地数据未做任何改动"}
+        return {"ok": False, "error": "Cannot reach the question server. Local data unchanged."}
 
-    if not _validate_manifest(manifest)[0]:
-        return {"ok": False, "error": f"题目清单格式不兼容（{_validate_manifest(manifest)[1]}），已中止同步，本地数据未改动"}
+    ok, error = _validate_manifest(manifest)
+    if not ok:
+        return {"ok": False, "error": f"Manifest incompatible ({error}). Sync aborted; local data unchanged."}
 
     server_weeks = {int(w[4:]) for w in manifest["weeks"]}
     local_weeks = qm.scan_local_weeks()
@@ -92,7 +93,7 @@ def run_sync() -> dict:
         try:
             info = qm.fetch_json(f"{base}/week{w}/info.json")
         except Exception:
-            summary["errors"].append(f"week{w}: 获取配置失败")
+            summary["errors"].append(f"week{w}: failed to fetch info.json")
             continue
 
         local_info = qm.read_json(os.path.join(config.QUESTIONS_DIR, f"week{w}", "info.json"))
@@ -102,7 +103,7 @@ def run_sync() -> dict:
         try:
             qm.download_week(w, info, student_id)
         except Exception:
-            summary["errors"].append(f"week{w}: 题目下载失败")
+            summary["errors"].append(f"week{w}: question download failed")
             continue
 
         summary["updated" if w in local_weeks else "added"].append(w)

@@ -6,6 +6,8 @@ import re
 import subprocess
 import sys
 
+from core.tool_runner import popen_kwargs
+
 
 def extract_signals_from_vcd(vcd_file: str) -> list:
     """Extract all signal names from VCD file.
@@ -113,7 +115,8 @@ def _check_gtkwave_in_wsl() -> bool:
         result = subprocess.run(
             ['wsl', 'which', 'gtkwave'],
             capture_output=True,
-            timeout=5
+            timeout=5,
+            **{k: v for k, v in popen_kwargs().items() if k in ('stdin', 'creationflags')}
         )
         return result.returncode == 0
     except Exception as e:
@@ -124,13 +127,9 @@ def _check_gtkwave_in_wsl() -> bool:
 def _launch_gtkwave_windows_native(gtkwave_path: str, vcd: str, script: str = None):
     """Launch native Windows GTKWave"""
     if script and os.path.exists(script):
-        return subprocess.Popen([gtkwave_path, '-S', script, vcd],
-                               stdout=subprocess.DEVNULL,
-                               stderr=subprocess.DEVNULL)
+        return subprocess.Popen([gtkwave_path, '-S', script, vcd], **popen_kwargs())
     else:
-        return subprocess.Popen([gtkwave_path, vcd],
-                               stdout=subprocess.DEVNULL,
-                               stderr=subprocess.DEVNULL)
+        return subprocess.Popen([gtkwave_path, vcd], **popen_kwargs())
 
 
 def _launch_gtkwave_wsl(vcd: str, script: str = None):
@@ -148,16 +147,12 @@ def _launch_gtkwave_wsl(vcd: str, script: str = None):
     if wsl_script:
         return subprocess.Popen(
             ['wsl', 'DISPLAY=:0', 'gtkwave', '-S', wsl_script, wsl_vcd],
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-            creationflags=subprocess.CREATE_NEW_PROCESS_GROUP
+            **popen_kwargs()
         )
     else:
         return subprocess.Popen(
             ['wsl', 'DISPLAY=:0', 'gtkwave', wsl_vcd],
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-            creationflags=subprocess.CREATE_NEW_PROCESS_GROUP
+            **popen_kwargs()
         )
 
 
@@ -234,15 +229,14 @@ def open_vcd_in_gtkwave(vcd_file: str, label: str) -> tuple:
                     try:
                         subprocess.Popen(
                             ['gtkwave', '-S', tcl_script, vcd_file],
-                            stdout=subprocess.DEVNULL,
-                            stderr=subprocess.DEVNULL
+                            **popen_kwargs()
                         )
                         print("Launched macOS GTKWave with script")
                     except Exception:
-                        subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                        subprocess.Popen(cmd, **popen_kwargs())
                         print("Launched macOS GTKWave via open -a")
                 else:
-                    subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                    subprocess.Popen(cmd, **popen_kwargs())
                     print("Launched macOS GTKWave via open -a")
 
                 return True, f"Opening {label} in GTKWave..."
@@ -251,14 +245,12 @@ def open_vcd_in_gtkwave(vcd_file: str, label: str) -> tuple:
                     if has_script and os.path.exists(tcl_script):
                         subprocess.Popen(
                             ['gtkwave', '-S', tcl_script, vcd_file],
-                            stdout=subprocess.DEVNULL,
-                            stderr=subprocess.DEVNULL
+                            **popen_kwargs()
                         )
                     else:
                         subprocess.Popen(
                             ['gtkwave', vcd_file],
-                            stdout=subprocess.DEVNULL,
-                            stderr=subprocess.DEVNULL
+                            **popen_kwargs()
                         )
                     return True, f"Opening {label} in GTKWave..."
                 except Exception as e2:
@@ -269,15 +261,13 @@ def open_vcd_in_gtkwave(vcd_file: str, label: str) -> tuple:
                 if has_script and os.path.exists(tcl_script):
                     subprocess.Popen(
                         ['gtkwave', '-S', tcl_script, vcd_file],
-                        stdout=subprocess.DEVNULL,
-                        stderr=subprocess.DEVNULL
+                        **popen_kwargs()
                     )
                     print(f"Launched Linux GTKWave with script: {tcl_script}")
                 else:
                     subprocess.Popen(
                         ['gtkwave', vcd_file],
-                        stdout=subprocess.DEVNULL,
-                        stderr=subprocess.DEVNULL
+                        **popen_kwargs()
                     )
                     print("Launched Linux GTKWave without script")
 

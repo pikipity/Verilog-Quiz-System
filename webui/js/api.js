@@ -27,7 +27,7 @@ function showBackendLost() {
   if (document.getElementById('backend-lost')) return;
   const overlay = document.createElement('div');
   overlay.id = 'backend-lost';
-  overlay.innerHTML = '<div class="backend-lost-box">本地后端已退出或无法连接。<br>请重新启动 Verilog Quiz System 程序。</div>';
+  overlay.innerHTML = '<div class="backend-lost-box">The local backend has exited or is unreachable.<br>Please relaunch Verilog Quiz System.</div>';
   document.body.appendChild(overlay);
 }
 

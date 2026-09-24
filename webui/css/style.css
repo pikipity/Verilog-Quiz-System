@@ -27,6 +27,18 @@ body {
 
 .topbar nav a:hover { color: #fff; }
 
+.topbar .nav-btn {
+  background: transparent;
+  border: 1px solid #4b5563;
+  color: #cbd5e1;
+  padding: 4px 12px;
+  margin-left: 16px;
+  font-size: 14px;
+  border-radius: 6px;
+}
+
+.topbar .nav-btn:hover { color: #fff; border-color: #9ca3af; }
+
 main {
   max-width: 860px;
   margin: 24px auto;

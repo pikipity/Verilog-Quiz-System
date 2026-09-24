@@ -23,7 +23,7 @@ async function route() {
   try {
     settings = await api('/api/settings');
   } catch (e) {
-    app.innerHTML = `<div class="card"><p class="msg err">无法连接本地后端：${e.message}</p></div>`;
+    app.innerHTML = `<div class="card"><p class="msg err">Cannot reach the local backend: ${e.message}</p></div>`;
     return;
   }
 
@@ -61,5 +61,8 @@ async function route() {
 
 initToken();
 startHeartbeat();
+document.getElementById('open-data-dir').addEventListener('click', () => {
+  api('/api/open_data_folder', { method: 'POST' }).catch(() => {});
+});
 window.addEventListener('hashchange', route);
 route();

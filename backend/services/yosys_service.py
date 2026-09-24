@@ -13,7 +13,7 @@ from backend.services import settings_service
 
 _YOSYS_SCRIPT = 'read_verilog student.v; hierarchy -auto-top; proc; opt; write_json rtl.json'
 
-_BEHAVIORAL_HINT = "RTL 视图仅适用于可综合代码（不包含 #延迟、initial 等行为级语法），仿真波形不受影响。"
+_BEHAVIORAL_HINT = "RTL view only works for synthesizable code (no #delays, initial blocks, etc.). Simulation waveform is unaffected."
 
 
 def generate_rtl(week, qid):
@@ -21,11 +21,11 @@ def generate_rtl(week, qid):
     settings = settings_service.load_settings()
     runner = ToolRunner('yosys', ['-V'], settings["tool_paths"].get("yosys", ""))
     if not runner.available:
-        return {"ok": False, "error": "未检测到 Yosys。请按安装手册安装，或在设置页手动指定路径。"}
+        return {"ok": False, "error": "Yosys not detected. Install it per the manual, or set its path in Settings."}
 
     code_file = os.path.join(config.SUBMISSIONS_DIR, f"week{week}", qid, f"{qid}.v")
     if not os.path.exists(code_file):
-        return {"ok": False, "error": "请先编写并保存代码。"}
+        return {"ok": False, "error": "Write and save your code first."}
     with open(code_file, 'r', encoding='utf-8') as f:
         code = f.read()
 
@@ -39,7 +39,7 @@ def generate_rtl(week, qid):
     if not ok:
         return {
             "ok": False,
-            "error": (stderr or stdout or "Yosys 执行失败").strip(),
+            "error": (stderr or stdout or "Yosys execution failed").strip(),
             "hint": _BEHAVIORAL_HINT,
         }
 
@@ -48,6 +48,6 @@ def generate_rtl(week, qid):
         with open(json_path, 'r', encoding='utf-8') as f:
             netlist = json.load(f)
     except (OSError, json.JSONDecodeError):
-        return {"ok": False, "error": "Yosys 输出解析失败。"}
+        return {"ok": False, "error": "Failed to parse Yosys output."}
 
     return {"ok": True, "netlist": netlist}

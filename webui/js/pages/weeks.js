@@ -4,11 +4,11 @@ import { escapeHtml } from '../util.js';
 export async function renderWeeks(root) {
   root.innerHTML = `
     <div class="page-head">
-      <h2>周次列表</h2>
-      <button id="sync-btn">检查更新</button>
+      <h2>Weeks</h2>
+      <button id="sync-btn">Check Update</button>
     </div>
     <div id="sync-result"></div>
-    <div id="week-list" class="empty">加载中…</div>
+    <div id="week-list" class="empty">Loading…</div>
   `;
 
   const listEl = root.querySelector('#week-list');
@@ -17,7 +17,7 @@ export async function renderWeeks(root) {
   root.querySelector('#sync-btn').addEventListener('click', async (e) => {
     const btn = e.target;
     btn.disabled = true;
-    btn.textContent = '同步中…';
+    btn.textContent = 'Syncing…';
     const resultEl = root.querySelector('#sync-result');
     resultEl.innerHTML = '';
 
@@ -37,38 +37,38 @@ export async function renderWeeks(root) {
       resultEl.innerHTML = `<div class="card sync-summary"><span class="errors">${escapeHtml(err.message)}</span></div>`;
     } finally {
       btn.disabled = false;
-      btn.textContent = '检查更新';
+      btn.textContent = 'Check Update';
     }
   });
 }
 
 function renderSummary(summary) {
   const parts = [];
-  if (summary.added.length) parts.push(`<span class="added">新增 ${formatWeeks(summary.added)}</span>`);
-  if (summary.updated.length) parts.push(`<span class="updated">更新 ${formatWeeks(summary.updated)}</span>`);
-  if (summary.removed.length) parts.push(`<span class="removed">移除 ${formatWeeks(summary.removed)}（本地数据已删除）</span>`);
-  if (summary.errors.length) parts.push(`<span class="errors">${summary.errors.map(escapeHtml).join('；')}</span>`);
-  if (!parts.length) parts.push('<span>已是最新，无变化。</span>');
+  if (summary.added.length) parts.push(`<span class="added">Added ${formatWeeks(summary.added)}</span>`);
+  if (summary.updated.length) parts.push(`<span class="updated">Updated ${formatWeeks(summary.updated)}</span>`);
+  if (summary.removed.length) parts.push(`<span class="removed">Removed ${formatWeeks(summary.removed)} (local data deleted)</span>`);
+  if (summary.errors.length) parts.push(`<span class="errors">${summary.errors.map(escapeHtml).join('; ')}</span>`);
+  if (!parts.length) parts.push('<span>Already up to date.</span>');
   return `<div class="card sync-summary">${parts.join('　')}</div>`;
 }
 
 function formatWeeks(weeks) {
-  return weeks.map(w => `Week ${w}`).join('、');
+  return weeks.map(w => `Week ${w}`).join(', ');
 }
 
 async function loadWeeks(listEl) {
   const data = await api('/api/weeks');
   if (!data.weeks.length) {
     listEl.className = 'empty';
-    listEl.textContent = '本地还没有题目，点击右上角"检查更新"下载。';
+    listEl.textContent = 'No questions yet. Click "Check Update" to download.';
     return;
   }
 
   listEl.className = '';
   listEl.innerHTML = data.weeks.map(w => `
     <div class="card week-card">
-      <span class="week-title">Week ${w.week}：${escapeHtml(w.title)}</span>
-      <div class="week-progress">已尝试 ${w.attempted}/${w.total} 题　<a href="#/report/${w.week}">查看报告 →</a></div>
+      <span class="week-title">Week ${w.week}: ${escapeHtml(w.title)}</span>
+      <div class="week-progress">Attempted ${w.attempted}/${w.total}　<a href="#/report/${w.week}">View Report →</a></div>
       <div class="questions" data-week="${w.week}"></div>
     </div>
   `).join('');
@@ -80,11 +80,11 @@ async function loadWeeks(listEl) {
       el.innerHTML = data.questions.map(q => `
         <a class="question-row" href="#/question/${week}/${q.id}">
           <span>${escapeHtml(q.title)} <small>(${escapeHtml(q.id)})</small></span>
-          <span class="${q.attempted ? 'status-done' : 'status-todo'}">${q.attempted ? '● 已尝试' : '○ 未尝试'}</span>
+          <span class="${q.attempted ? 'status-done' : 'status-todo'}">${q.attempted ? '● Attempted' : '○ Not attempted'}</span>
         </a>
       `).join('');
     } catch {
-      el.innerHTML = '<div class="question-row">题目信息读取失败</div>';
+      el.innerHTML = '<div class="question-row">Failed to load questions</div>';
     }
   }
 }

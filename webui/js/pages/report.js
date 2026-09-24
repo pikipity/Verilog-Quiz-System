@@ -4,14 +4,14 @@ import { escapeHtml } from '../util.js';
 export async function renderReport(root, week) {
   root.innerHTML = `
     <div class="page-head">
-      <h2>Week ${week} 报告</h2>
+      <h2>Week ${week} Report</h2>
       <div class="actions">
-        <button class="secondary" id="open-folder">打开文件位置</button>
-        <button class="secondary" id="back-weeks">返回周次</button>
+        <button class="secondary" id="open-folder">Open File Location</button>
+        <button class="secondary" id="back-weeks">Back to Weeks</button>
       </div>
     </div>
-    <p id="report-msg" class="msg">正在生成最新报告…</p>
-    <div class="card" id="report-preview">加载中…</div>
+    <p id="report-msg" class="msg">Generating the latest report…</p>
+    <div class="card" id="report-preview">Loading…</div>
   `;
 
   const msg = root.querySelector('#report-msg');
@@ -23,7 +23,7 @@ export async function renderReport(root, week) {
     const r = await api(`/api/reports/${week}/generate`, { method: 'POST' });
     if (r.ok) {
       msg.className = 'msg ok';
-      msg.textContent = `已生成最新报告 ${r.filename}（每次进入本页自动更新）`;
+      msg.textContent = `Latest report generated: ${r.filename} (regenerated on every visit)`;
     } else {
       genError = r.error;
     }
@@ -33,7 +33,7 @@ export async function renderReport(root, week) {
 
   if (genError) {
     msg.className = 'msg err';
-    msg.textContent = `报告生成失败：${genError}`;
+    msg.textContent = `Failed to generate report: ${genError}`;
   }
 
   // 加载预览（生成失败时若存在旧报告仍展示）
@@ -42,7 +42,7 @@ export async function renderReport(root, week) {
     preview.innerHTML = data.exists
       ? `<p class="hint-text">${escapeHtml(data.filename)}</p>` +
         `<div class="markdown">${DOMPurify.sanitize(marked.parse(data.content))}</div>`
-      : '<p class="empty">还没有报告数据。完成题目并运行测试后，进入本页会自动生成报告。</p>';
+      : '<p class="empty">No report yet. Work on the questions and run tests, then open this page — the report is generated automatically.</p>';
   } catch (e) {
     preview.innerHTML = `<p class="msg err">${escapeHtml(e.message)}</p>`;
   }
@@ -51,7 +51,7 @@ export async function renderReport(root, week) {
     try {
       const r = await api(`/api/reports/${week}/open_folder`, { method: 'POST' });
       msg.className = r.ok ? 'msg ok' : 'msg err';
-      msg.textContent = r.ok ? '已打开报告所在文件夹。' : r.error;
+      msg.textContent = r.ok ? 'Opened the report folder.' : r.error;
     } catch (err) {
       msg.className = 'msg err';
       msg.textContent = err.message;

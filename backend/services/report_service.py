@@ -1,5 +1,5 @@
 """
-报告服务：生成、读取、打开文件位置
+报告与文件位置服务：报告生成/读取、打开报告目录、打开数据目录
 """
 import os
 import subprocess
@@ -7,6 +7,7 @@ import sys
 
 import config
 from core.report_generator import report_generator
+from core.tool_runner import popen_kwargs
 from backend.services import settings_service
 
 
@@ -17,7 +18,7 @@ def generate_report(week: int) -> dict:
         "name": settings.get("name", ""),
     })
     if not path:
-        return {"ok": False, "error": "生成失败：本周题目数据缺失，请先同步。"}
+        return {"ok": False, "error": "Failed to generate: week data missing. Please sync questions first."}
     return {"ok": True, "filename": os.path.basename(path)}
 
 
@@ -30,17 +31,23 @@ def get_report(week: int) -> dict:
     return {"exists": True, "filename": os.path.basename(path), "content": content}
 
 
-def open_reports_folder() -> dict:
-    """在系统文件管理器中打开报告目录。"""
-    folder = config.REPORTS_DIR
+def _open_folder(path: str) -> dict:
+    """在系统文件管理器中打开指定目录。"""
     try:
         if sys.platform == 'win32':
-            os.startfile(folder)
+            os.startfile(path)
         elif sys.platform == 'darwin':
-            subprocess.Popen(['open', folder])
+            subprocess.Popen(['open', path], **popen_kwargs())
         else:
-            subprocess.Popen(['xdg-open', folder],
-                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            subprocess.Popen(['xdg-open', path], **popen_kwargs())
         return {"ok": True}
     except Exception as e:
         return {"ok": False, "error": str(e)}
+
+
+def open_reports_folder() -> dict:
+    return _open_folder(config.REPORTS_DIR)
+
+
+def open_data_folder() -> dict:
+    return _open_folder(config.BASE_DIR)

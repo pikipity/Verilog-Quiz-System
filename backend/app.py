@@ -207,6 +207,9 @@ class QuizHandler(BaseHTTPRequestHandler):
         if path == '/api/tools/gtkwave_test' and self.command == 'POST':
             self._send_json(diagnostics.test_open_gtkwave())
             return
+        if path == '/api/open_data_folder' and self.command == 'POST':
+            self._send_json(report_service.open_data_folder())
+            return
         if path == '/api/settings' and self.command == 'PUT':
             body = self._read_body()
             if body is None:

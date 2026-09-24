@@ -120,7 +120,7 @@ class ReportGenerator:
             "",
             "**Value Comparison** (reference vs student):",
             "",
-            "| 时间(ns) | 参考 | 学生 | 结果 |",
+            "| Time (ns) | Reference | Student | Result |",
             "|---|---|---|---|",
         ]
         for comp in analysis.comparisons:
@@ -129,7 +129,7 @@ class ReportGenerator:
             mark = "✓" if comp.match else "✗"
             lines.append(f"| {comp.time} | {ref_str} | {stu_str} | {mark} |")
 
-        lines.extend(["", f"**Overall**: {'✅ 全部一致' if analysis.all_match else '❌ 存在不一致'}"])
+        lines.extend(["", f"**Overall**: {'✅ All values match' if analysis.all_match else '❌ Mismatches found'}"])
         return lines
 
     # ---------- 数据读取 ----------

@@ -12,9 +12,10 @@ from datetime import datetime
 import config
 from core import question_manager as qm
 from core.code_executor import CodeExecutor
+from core.tool_runner import popen_kwargs
 from backend.services import settings_service
 
-_DEFAULT_CODE = "// 在此编写你的 Verilog 代码\n"
+_DEFAULT_CODE = "// Write your Verilog code here\n"
 
 
 def _week_str(week) -> str:
@@ -156,15 +157,15 @@ def run_test(week, qid, code: str):
     settings = settings_service.load_settings()
     executor = CodeExecutor(settings["tool_paths"].get("iverilog", ""))
     if not executor.available:
-        return {"ok": False, "error": "未检测到 iverilog。请按安装手册安装，或在设置页手动指定路径。"}
+        return {"ok": False, "error": "iverilog not detected. Install it per the manual, or set its path in Settings."}
 
     ref_code = qm.get_reference_code(week, qid)
     if ref_code is None:
-        return {"ok": False, "error": "参考代码缺失，请重新同步题目。"}
+        return {"ok": False, "error": "Reference code missing. Please re-sync questions."}
 
     tb_path = os.path.join(_question_dir(week, qid), "testbench.v")
     if not os.path.exists(tb_path):
-        return {"ok": False, "error": "testbench 缺失，请重新同步题目。"}
+        return {"ok": False, "error": "Testbench missing. Please re-sync questions."}
     with open(tb_path, 'r', encoding='utf-8') as f:
         testbench = f.read()
 
@@ -217,22 +218,21 @@ def get_result(week, qid):
 def open_gtkwave(week, qid, which: str):
     """拉起 GTKWave 查看波形。which: student | ref"""
     vcd_name = "student_wave.vcd" if which == "student" else "ref_wave.vcd"
-    label = "你的波形" if which == "student" else "期望波形"
+    label = "Your waveform" if which == "student" else "Expected waveform"
     vcd_path = os.path.join(_submission_dir(week, qid), "temp", vcd_name)
 
     if not os.path.exists(vcd_path):
-        return {"ok": False, "error": f"{label}文件不存在，请先运行测试。"}
+        return {"ok": False, "error": f"{label} file not found. Run the test first."}
 
     # 用户手动指定的 GTKWave 优先
     settings = settings_service.load_settings()
     override = settings["tool_paths"].get("gtkwave", "")
     if override and os.path.exists(override):
         try:
-            subprocess.Popen([override, vcd_path],
-                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-            return {"ok": True, "message": f"正在打开{label}…"}
+            subprocess.Popen([override, vcd_path], **popen_kwargs())
+            return {"ok": True, "message": f"Opening {label.lower()}..."}
         except Exception as e:
-            return {"ok": False, "error": f"GTKWave 启动失败: {e}"}
+            return {"ok": False, "error": f"Failed to launch GTKWave: {e}"}
 
     from core import gtkwave_helper
     success, message = gtkwave_helper.open_vcd_in_gtkwave(vcd_path, label)

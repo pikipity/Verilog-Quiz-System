@@ -27,34 +27,34 @@ export async function renderQuestion(root, week, qid) {
         </a>`).join('')}
     </div>
     <div class="card">
-      <h3>题目描述</h3>
+      <h3>Question Description</h3>
       <div class="markdown" id="md"></div>
     </div>
     <div class="card">
-      <h3>代码编辑器</h3>
+      <h3>Code Editor</h3>
       <textarea id="code"></textarea>
       <div class="editor-bar">
         <span id="save-state" class="save-state"></span>
-        <button id="run-test">运行测试</button>
+        <button id="run-test">Run Test</button>
       </div>
     </div>
     <div class="card" id="result-card" style="display:none"></div>
     <div class="card">
-      <h3>RTL 视图</h3>
-      <p class="hint-text">由 Yosys 根据你的代码生成门级电路图（不包含参考代码）。</p>
+      <h3>RTL View</h3>
+      <p class="hint-text">Gate-level circuit generated from YOUR code by Yosys (reference code is never used).</p>
       <div class="actions">
-        <button class="secondary" id="gen-rtl">生成 RTL 视图</button>
+        <button class="secondary" id="gen-rtl">Generate RTL View</button>
       </div>
       <p id="rtl-msg" class="msg"></p>
       <div id="rtl-container" style="display:none"></div>
     </div>
     <div class="card">
-      <h3>Testbench（只读）</h3>
+      <h3>Testbench (read-only)</h3>
       <pre class="tb">${escapeHtml(question.testbench)}</pre>
     </div>
     <div class="nav-bar">
-      <button class="secondary" id="prev-btn">上一题</button>
-      <button id="save-continue">保存并继续</button>
+      <button class="secondary" id="prev-btn">Previous</button>
+      <button id="save-continue">Save &amp; Continue</button>
     </div>
   `;
 
@@ -107,9 +107,9 @@ async function saveCode() {
       method: 'PUT',
       body: { code: editor.getValue() },
     });
-    if (state) state.textContent = `已保存 ${r.time}`;
+    if (state) state.textContent = `Saved ${r.time}`;
   } catch (e) {
-    if (state) state.textContent = `保存失败：${e.message}`;
+    if (state) state.textContent = `Save failed: ${e.message}`;
   }
 }
 
@@ -117,8 +117,15 @@ async function runTest() {
   if (!editor || !currentCtx) return;
   const { week, qid } = currentCtx;
   const btn = document.getElementById('run-test');
+
+  // 立即清空上一次结果并显示等待状态
+  const card = document.getElementById('result-card');
+  card.style.display = '';
+  card.innerHTML = '<h3>Test Result</h3><p class="msg">⏳ Running test, waiting for result…</p>';
+  card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
   btn.disabled = true;
-  btn.textContent = '测试中…';
+  btn.textContent = 'Testing…';
   try {
     await saveCode();
     const data = await api(`/api/questions/${week}/${qid}/test`, {
@@ -134,14 +141,14 @@ async function runTest() {
     showError(e.message);
   } finally {
     btn.disabled = false;
-    btn.textContent = '运行测试';
+    btn.textContent = 'Run Test';
   }
 }
 
 function showError(message) {
   const card = document.getElementById('result-card');
   card.style.display = '';
-  card.innerHTML = `<h3>测试结果</h3><p class="msg err">${escapeHtml(message || '未知错误')}</p>`;
+  card.innerHTML = `<h3>Test Result</h3><p class="msg err">${escapeHtml(message || 'Unknown error')}</p>`;
   card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
@@ -150,20 +157,20 @@ function showResult(result) {
   card.style.display = '';
 
   let status;
-  if (!result.compile_success) status = '<p class="msg err">✗ 编译失败</p>';
-  else if (!result.run_success) status = '<p class="msg err">✗ 仿真运行失败</p>';
-  else status = '<p class="msg ok">✓ 编译并运行成功</p>';
+  if (!result.compile_success) status = '<p class="msg err">✗ Compilation failed</p>';
+  else if (!result.run_success) status = '<p class="msg err">✗ Simulation failed</p>';
+  else status = '<p class="msg ok">✓ Compiled and simulated successfully</p>';
 
   const waves = result.run_success ? `
     <div class="actions">
-      <button class="secondary" id="wave-ref">查看期望波形</button>
-      <button class="secondary" id="wave-student">查看你的波形</button>
+      <button class="secondary" id="wave-ref">View Expected Waveform</button>
+      <button class="secondary" id="wave-student">View Your Waveform</button>
     </div>` : '';
 
   const output = result.output ? `<pre class="tb">${escapeHtml(result.output)}</pre>` : '';
   const error = result.error ? `<pre class="tb err-text">${escapeHtml(result.error)}</pre>` : '';
 
-  card.innerHTML = `<h3>测试结果</h3>${status}${waves}${output}${error}<p id="wave-msg" class="msg"></p>`;
+  card.innerHTML = `<h3>Test Result</h3>${status}${waves}${output}${error}<p id="wave-msg" class="msg"></p>`;
 
   if (result.run_success) {
     document.getElementById('wave-ref').addEventListener('click', () => openWave('ref'));
@@ -178,7 +185,7 @@ async function openWave(which) {
   try {
     const r = await api(`/api/questions/${week}/${qid}/gtkwave?which=${which}`, { method: 'POST' });
     msg.className = r.ok ? 'msg ok' : 'msg err';
-    msg.textContent = r.ok ? (r.message || '正在打开…') : (r.error || '打开失败');
+    msg.textContent = r.ok ? (r.message || 'Opening…') : (r.error || 'Failed to open');
   } catch (e) {
     msg.className = 'msg err';
     msg.textContent = e.message;
@@ -195,7 +202,7 @@ async function generateRtl() {
   const container = document.getElementById('rtl-container');
 
   btn.disabled = true;
-  btn.textContent = '生成中…';
+  btn.textContent = 'Generating…';
   msg.className = 'msg';
   msg.textContent = '';
   container.style.display = 'none';
@@ -223,13 +230,13 @@ async function generateRtl() {
       center: true,
     });
     msg.className = 'msg ok';
-    msg.textContent = '已生成，可拖拽缩放查看。';
+    msg.textContent = 'Generated. Drag and zoom to explore.';
     container.scrollIntoView({ behavior: 'smooth', block: 'center' });
   } catch (e) {
     msg.className = 'msg err';
-    msg.textContent = '生成失败：' + e.message;
+    msg.textContent = 'Generation failed: ' + e.message;
   } finally {
     btn.disabled = false;
-    btn.textContent = '生成 RTL 视图';
+    btn.textContent = 'Generate RTL View';
   }
 }

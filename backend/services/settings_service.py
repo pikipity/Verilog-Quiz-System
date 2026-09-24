@@ -42,9 +42,9 @@ def save_settings(new: dict) -> dict:
     new_id = str(new.get("student_id", "")).strip()
 
     if not new_id:
-        return {"saved": False, "error": "学号不能为空"}
+        return {"saved": False, "error": "Student ID is required"}
     if '/' in new_id or '\\' in new_id:
-        return {"saved": False, "error": "学号不能包含路径分隔符"}
+        return {"saved": False, "error": "Student ID must not contain path separators"}
 
     wiped = False
     if old_id and old_id != new_id:
