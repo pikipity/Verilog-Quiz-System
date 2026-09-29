@@ -2,7 +2,7 @@
 
 ## 项目概述
 
-单机版Verilog作业与考试系统。学生双击启动器后，程序在本机启动一个纯Python后端服务，并自动用默认浏览器打开界面。程序自动加密保护标准答案，调用iverilog进行仿真测试，调用Yosys生成RTL视图，生成Markdown格式报告供老师人工判卷。
+单机版Verilog作业与考试系统。学生双击启动器后，程序在本机启动一个纯Python后端服务，并自动用默认浏览器打开界面。程序自动加密保护标准答案，调用iverilog进行仿真测试，调用Yosys生成RTL视图，生成PDF报告供老师人工判卷。
 
 ## v2 重构背景（为什么放弃 v1 架构）
 
@@ -29,7 +29,7 @@ v2 的核心原则：**把环境差异降到理论下限**
 | **仿真执行** | iverilog + vvp | 锁定版本，学生自行安装 |
 | **波形查看** | GTKWave | 锁定版本，学生自行安装 |
 | **RTL 视图** | Yosys write_json + netlistsvg | Yosys 锁版本学生自装；netlistsvg vendored，浏览器内渲染 SVG；仅对学生代码 |
-| **报告** | Markdown 本地生成 | 学生手动提交；内含数值对比表（仅供老师判卷） |
+| **报告** | PDF 本地生成（fpdf2 + 内嵌 Noto Sans CJK 字体） | 学生手动提交；Markdown 不落盘，仅内存中间态；内含数值对比表（仅供老师判卷） |
 
 ---
 
@@ -92,9 +92,13 @@ Verilog-Quiz-System/
 ├── core/                            # v1保留的核心资产
 │   ├── crypto_manager.py            # 加密/解密（不变）
 │   ├── question_manager.py          # 下载、加密存储（保留）；同步对账与学号抽题（重写）
-│   ├── code_executor.py             # iverilog/vvp跨平台调用（平移，加yosys）
+│   ├── code_executor.py             # iverilog/vvp跨平台调用（基于tool_runner）
+│   ├── tool_runner.py               # 跨平台命令执行（静默参数+重试），新增
 │   ├── result_analyzer.py           # $display数值对比（供报告生成使用）
-│   └── report_generator.py          # 报告生成（加学号头部+数值对比表）
+│   ├── report_generator.py          # 报告结构化内容（不落盘）
+│   ├── pdf_generator.py             # PDF渲染（fpdf2+内嵌CJK字体），新增
+│   └── gtkwave_helper.py            # GTKWave集成（平移）
+├── assets/fonts/                    # vendored Noto Sans CJK SC（PDF用，OFL许可）
 ├── webui/                           # 前端静态文件（无构建步骤）
 │   ├── index.html
 │   ├── js/                          # 五个页面模块 + API封装 + hash路由
@@ -198,19 +202,23 @@ Verilog-Quiz-System/
 
 **进度语义**：程序不判断"完成"（测试通过不等于做对，判卷由老师人工进行），只记录**已尝试/未尝试**——保存过非默认内容的代码即为"已尝试"。周次页与题目导航只显示已尝试状态。
 
-### 7. 报告生成流程
+### 7. 报告生成流程（PDF）
 
 ```
-进入报告页 → 自动生成最新报告（覆盖旧报告）→ 读取draw_result.json确定题目顺序
+进入报告页 → 自动生成最新报告（覆盖旧报告，无需任何点击）
   ↓
-逐题整合：题面（过滤图片语法）+ 学生代码 + 测试结果
+report_generator 产出结构化内容（读取draw_result.json确定题目顺序，
+  ↓  逐题整合题面+学生代码+测试结果+result_analyzer逐时刻数值对比）
+pdf_generator 渲染（fpdf2 + 内嵌 Noto Sans CJK SC，GitHub 风格）
   ↓
-数值对比表：调用result_analyzer对比学生与参考的$display输出，
-  ↓        逐时刻列表写入报告（仅供老师判卷，前端不展示）
-生成 reports/weekN_report.md（头部含学号+姓名）
+生成 reports/weekN_report.pdf（Markdown 不落盘，仅内存中间态）
   ↓
-预览 + "打开文件位置" → 学生手动到学校系统提交
+页面内嵌 PDF 预览（浏览器原生阅读器）+ "Open File Location"
+  ↓
+学生手动将 PDF 提交到学校系统
 ```
+
+**字形注意**：Noto Sans CJK SC 缺 ✗/❌/✅ 字形，PDF 中对比结果用 ✓/X 表示。
 
 ---
 
@@ -282,7 +290,7 @@ Windows 优先调用原生 iverilog/GTKWave，失败时 fallback 到 WSL（保�
 1. **设置页**（Settings）：Student ID（必填）、Name、Tool paths（可选覆盖）、Test Server Connection；
 2. **周次列表页**（Weeks）：周次卡片（Attempted 进度）、[Check Update] 按钮、同步摘要（Added/Updated/Removed）；顶部导航另有 [Data Folder] 按钮打开数据目录；
 3. **答题页**（Question）：Question Description（Markdown 渲染含图片）、Code Editor（Verilog 高亮+行号）、Testbench 只读区、[Run Test] 与结果面板（点击后先清空旧结果显示"⏳ Running test, waiting for result…"再更新；含 View Expected/Your Waveform 两按钮）、RTL View 卡片、[Previous] [Save & Continue]；
-4. **报告页**（Report）：进入即自动生成最新报告（无生成按钮）、预览、[Open File Location]；
+4. **报告页**（Report）：进入即自动生成最新 PDF（无生成按钮）、浏览器内嵌 PDF 预览、[Open File Location]；
 5. **诊断页**（Diagnostics）：工具三级验证表格（状态灯/Detected vs Pinned/Location）、[Run Self-Check]、[Test-launch GTKWave]、[Copy Diagnostics]。
 
 ---
@@ -380,7 +388,7 @@ uv run python main.py
 
 ## 技术约束与注意事项
 
-1. **零第三方 Python 依赖**：后端仅用标准库（HTTP 用 http.server，网络用 urllib，加密用 hashlib），新增依赖需重新评估打包风险；
+1. **零第三方 Python 依赖原则**：后端仅用标准库（HTTP 用 http.server，网络用 urllib，加密用 hashlib）。已评估放行的例外：`fpdf2`（含 fonttools/pillow，纯 Python，用于 PDF 报告，PyInstaller 打包无原生风险）。再新增依赖需同样评估；
 2. **前端零构建**：只允许原生 ES Modules + vendored 库，不引入 npm/打包器；
 3. **URL 不明文**：服务器地址不得出现在明文源码、日志、API 返回、界面上；
 4. **明文不落盘**：reference.v 仅在内存解密，临时文件用完即删；

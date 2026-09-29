@@ -4,7 +4,9 @@ version = "2.0.0"
 description = "Verilog作业考试系统 - 单机版（本地后端 + 浏览器前端）"
 readme = "README.md"
 requires-python = ">=3.11"
-dependencies = []
+dependencies = [
+    "fpdf2>=2.8.8",
+]
 
 [dependency-groups]
 dev = [

@@ -45,7 +45,15 @@ export async function api(path, { method = 'GET', body } = {}) {
   try { data = await resp.json(); } catch { /* 非 JSON 响应 */ }
 
   if (!resp.ok) {
-    throw new Error((data && data.error) || `请求失败 (${resp.status})`);
+    throw new Error((data && data.error) || `Request failed (${resp.status})`);
   }
   return data;
+}
+
+export async function apiBlob(path) {
+  const resp = await fetch(path, {
+    headers: { 'X-Quiz-Token': sessionStorage.getItem(TOKEN_KEY) || '' },
+  });
+  if (!resp.ok) throw new Error(`Request failed (${resp.status})`);
+  return resp.blob();
 }

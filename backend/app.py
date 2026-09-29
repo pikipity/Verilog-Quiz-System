@@ -85,6 +85,14 @@ class QuizHandler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
+    def _send_bytes(self, data: bytes, content_type: str, status: int = 200):
+        self.send_response(status)
+        self.send_header('Content-Type', content_type)
+        self.send_header('Content-Length', str(len(data)))
+        self.send_header('Cache-Control', 'no-store')
+        self.end_headers()
+        self.wfile.write(data)
+
     def _host_allowed(self) -> bool:
         host = self.headers.get('Host', '')
         return host.startswith('127.0.0.1') or host.startswith('localhost')
@@ -159,6 +167,15 @@ class QuizHandler(BaseHTTPRequestHandler):
             return
         if path == '/api/tools/status':
             self._send_json(diagnostics.get_tools_status())
+            return
+
+        m = re.fullmatch(r'/api/reports/(\d+)/pdf', path)
+        if m:
+            data = report_service.get_report_pdf(int(m.group(1)))
+            if data is None:
+                self._send_json({"error": "not found"}, 404)
+            else:
+                self._send_bytes(data, 'application/pdf')
             return
 
         m = re.fullmatch(r'/api/reports/(\d+)', path)

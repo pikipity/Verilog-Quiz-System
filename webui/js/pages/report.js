@@ -1,4 +1,4 @@
-import { api } from '../api.js';
+import { api, apiBlob } from '../api.js';
 import { escapeHtml } from '../util.js';
 
 export async function renderReport(root, week) {
@@ -11,40 +11,43 @@ export async function renderReport(root, week) {
       </div>
     </div>
     <p id="report-msg" class="msg">Generating the latest report…</p>
-    <div class="card" id="report-preview">Loading…</div>
+    <div class="card" id="report-preview"></div>
   `;
 
   const msg = root.querySelector('#report-msg');
   const preview = root.querySelector('#report-preview');
 
-  // 进入页面即自动生成最新报告（自动覆盖旧报告）
-  let genError = '';
+  // 进入页面即自动生成最新 PDF 报告（覆盖旧报告），无需任何点击
+  let generated = null;
   try {
     const r = await api(`/api/reports/${week}/generate`, { method: 'POST' });
     if (r.ok) {
+      generated = r;
       msg.className = 'msg ok';
-      msg.textContent = `Latest report generated: ${r.filename} (regenerated on every visit)`;
+      msg.textContent = `Latest report generated: ${r.filename} (${formatSize(r.size)}; regenerated on every visit)`;
     } else {
-      genError = r.error;
+      msg.className = 'msg err';
+      msg.textContent = r.error;
     }
   } catch (e) {
-    genError = e.message;
-  }
-
-  if (genError) {
     msg.className = 'msg err';
-    msg.textContent = `Failed to generate report: ${genError}`;
+    msg.textContent = e.message;
   }
 
-  // 加载预览（生成失败时若存在旧报告仍展示）
-  try {
-    const data = await api(`/api/reports/${week}`);
-    preview.innerHTML = data.exists
-      ? `<p class="hint-text">${escapeHtml(data.filename)}</p>` +
-        `<div class="markdown">${DOMPurify.sanitize(marked.parse(data.content))}</div>`
-      : '<p class="empty">No report yet. Work on the questions and run tests, then open this page — the report is generated automatically.</p>';
-  } catch (e) {
-    preview.innerHTML = `<p class="msg err">${escapeHtml(e.message)}</p>`;
+  if (generated) {
+    try {
+      const blob = await apiBlob(`/api/reports/${week}/pdf`);
+      const url = URL.createObjectURL(blob);
+      preview.innerHTML = `<iframe class="pdf-frame" src="${url}" title="Report PDF"></iframe>`;
+      window.__pageCleanup = (prev => () => {
+        URL.revokeObjectURL(url);
+        if (prev) prev();
+      })(window.__pageCleanup);
+    } catch (e) {
+      preview.innerHTML = `<p class="msg err">Failed to load PDF preview: ${escapeHtml(e.message)}</p>`;
+    }
+  } else {
+    preview.innerHTML = '<p class="empty">No report yet. Work on the questions and run tests, then open this page — the report is generated automatically.</p>';
   }
 
   root.querySelector('#open-folder').addEventListener('click', async () => {
@@ -61,4 +64,11 @@ export async function renderReport(root, week) {
   root.querySelector('#back-weeks').addEventListener('click', () => {
     location.hash = '#/weeks';
   });
+}
+
+function formatSize(bytes) {
+  if (!bytes) return '';
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }

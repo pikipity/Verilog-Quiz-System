@@ -280,22 +280,22 @@ yosys -V
 
 After completing the questions:
 
-1. 在周次页面点击 **"View Report →"** 进入报告页，程序会**自动生成最新报告**
-   - On the Weeks page, click **"View Report →"** to open the report page; the app **automatically generates the latest report**
+1. 在周次页面点击 **"View Report →"** 进入报告页，程序会**自动生成最新 PDF 报告**并内嵌显示在页面中
+   - On the Weeks page, click **"View Report →"** to open the report page; the app **automatically generates the latest PDF report** and displays it embedded in the page
    - 无需点击任何按钮：每次进入报告页都会重新生成并覆盖旧报告，报告始终反映你的最新代码与测试结果
    - No button needed: every time you open the report page, it regenerates and overwrites the old report — the report always reflects your latest code and test results
 
 2. 报告包含你的学号姓名、每题的题目描述、你的代码、测试结果，以及你的输出与标准答案的**逐时刻数值对比表**
    - The report contains your student ID and name, each question's description, your code, test results, and a **cycle-by-cycle value comparison table** between your output and the reference
 
-3. 点击 **"Open File Location"** 找到报告文件
-   - Click **"Open File Location"** to locate the report file
+3. 点击 **"Open File Location"** 找到 PDF 报告文件（`weekN_report.pdf`）
+   - Click **"Open File Location"** to locate the PDF report file (`weekN_report.pdf`)
 
-4. 手动将报告文件提交到学校作业系统
-   - Manually submit the report file to the school assignment system
+4. 手动将 PDF 报告文件提交到学校作业系统
+   - Manually submit the PDF report file to the school assignment system
 
-5. 如果重做了某道题，重新进入报告页即可获得更新后的报告
-   - If you redo a question, simply reopen the report page to get the updated report
+5. 如果重做了某道题，重新进入报告页即可获得更新后的 PDF
+   - If you redo a question, simply reopen the report page to get the updated PDF
 
 ### 查看数据目录 / View Data Directory
 

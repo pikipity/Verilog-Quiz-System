@@ -193,6 +193,14 @@ a.question-row:hover { background: #f8fafc; }
 
 #rtl-container svg { width: 100%; height: 100%; }
 
+.pdf-frame {
+  width: 100%;
+  height: 72vh;
+  border: none;
+  border-radius: 8px;
+  background: #525659;
+}
+
 .diag-table { width: 100%; border-collapse: collapse; font-size: 14px; }
 .diag-table th, .diag-table td {
   text-align: left;

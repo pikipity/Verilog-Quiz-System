@@ -43,11 +43,13 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Install PyInstaller
-        run: python -m pip install "pyinstaller>=6.19"
+      - name: Install uv
+        run: python -m pip install uv
 
-      - name: Build with PyInstaller
-        run: pyinstaller verilog-quiz.spec --noconfirm --clean
+      - name: Install dependencies and build
+        run: |
+          uv sync --group dev
+          uv run pyinstaller verilog-quiz.spec --noconfirm --clean
 
       - name: Smoke test (basic)
         shell: bash

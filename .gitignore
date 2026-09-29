@@ -46,6 +46,7 @@ questions/*/
 submissions/*/
 !submissions/.gitkeep
 reports/*.md
+reports/*.pdf
 !reports/.gitkeep
 settings.json
 app.log

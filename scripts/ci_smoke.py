@@ -95,9 +95,16 @@ def main():
 
     rep = call(base, args.token, '/api/reports/1/generate', method='POST')
     assert rep.get('ok'), rep
-    content = call(base, args.token, '/api/reports/1')['content']
-    assert 'ci0001' in content and 'Value Comparison' in content
-    print("[PASS] 报告生成（含学号与数值对比表）")
+    assert rep['filename'].endswith('.pdf'), rep
+    pdf = call(base, args.token, '/api/reports/1/pdf', raw=True)
+    assert pdf[:5] == b'%PDF-', '报告不是合法 PDF'
+    print(f"[PASS] PDF 报告生成（{len(pdf)} bytes）")
+
+    # Markdown 不应落盘
+    import os
+    legacy_md = os.path.expanduser('~/.local/share/verilog-quiz/reports/week1_report.md')
+    assert not os.path.exists(legacy_md), 'reports 目录不应存在 .md 报告'
+    print("[PASS] 无 Markdown 报告落盘")
 
     print("== 完整 E2E 全部通过 ==")
 
